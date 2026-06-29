@@ -1,6 +1,6 @@
 /**
  * ALL-IN-ONE PRODUKTIVITÄTS-APP — app.js
- * Firebase Realtime Database · Vanilla JS ES6+ Modules
+ * Firebase Realtime Database · Anonyme Auth · Vanilla JS ES6+ Modules
  */
 
 // ═══════════════════════════════════════════════════════
@@ -18,6 +18,11 @@ import {
   onValue,
   get
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import {
+  getAuth,
+  signInAnonymously,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey:            "AIzaSyB0Js8rK0QjQE71uruCkx0XukCTYoVk9Mg",
@@ -31,7 +36,8 @@ const firebaseConfig = {
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
-const db = getDatabase(firebaseApp);
+const db   = getDatabase(firebaseApp);
+const auth = getAuth(firebaseApp);
 
 // Firebase Referenzen (Pfade in der Realtime DB)
 const REFS = {
@@ -50,15 +56,15 @@ const REFS = {
 // ═══════════════════════════════════════════════════════
 
 const state = {
-  currentView:      "calendar",
-  currentDate:      new Date(),          // angezeigte Monats-Basis
-  selectedDate:     toDateString(new Date()), // "YYYY-MM-DD"
-  events:           {},
-  todos:            {},
-  notes:            {},
-  projects:         {},
-  todoFilter:       "all",
-  activeProjectId:  null,
+  currentView:          "calendar",
+  currentDate:          new Date(),
+  selectedDate:         toDateString(new Date()),
+  events:               {},
+  todos:                {},
+  notes:                {},
+  projects:             {},
+  todoFilter:           "all",
+  activeProjectId:      null,
   selectedProjectColor: "#6C63FF"
 };
 
@@ -66,30 +72,25 @@ const state = {
 // 3. HILFSFUNKTIONEN
 // ═══════════════════════════════════════════════════════
 
-/** Datum → "YYYY-MM-DD" */
 function toDateString(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const y   = d.getFullYear();
+  const m   = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
-/** Heute als "YYYY-MM-DD" */
 function today() { return toDateString(new Date()); }
 
-/** "YYYY-MM-DD" → "DD.MM.YYYY" */
 function formatDate(str) {
   if (!str) return "";
   const [y, m, d] = str.split("-");
   return `${d}.${m}.${y}`;
 }
 
-/** Monat + Jahr auf Deutsch */
 function formatMonthYear(date) {
   return date.toLocaleString("de-DE", { month: "long", year: "numeric" });
 }
 
-/** Toast-Benachrichtigung */
 let toastTimer = null;
 function showToast(msg) {
   const el = document.getElementById("toast");
@@ -99,10 +100,19 @@ function showToast(msg) {
   toastTimer = setTimeout(() => el.classList.remove("show"), 2800);
 }
 
-/** Objekt → sortiertes Array mit id-Schlüssel */
 function toArray(obj) {
   if (!obj) return [];
   return Object.entries(obj).map(([id, val]) => ({ ...val, id }));
+}
+
+function escHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // ═══════════════════════════════════════════════════════
@@ -199,7 +209,6 @@ async function createProject(data) {
 async function deleteProject(id) {
   try {
     await remove(REFS.project(id));
-    // Verknüpfungen in To-Dos und Notizen entfernen
     const todosSnap = await get(REFS.todos());
     if (todosSnap.exists()) {
       const updates = {};
@@ -223,7 +232,7 @@ async function deleteProject(id) {
 }
 
 // ═══════════════════════════════════════════════════════
-// 8. FIREBASE REALTIME LISTENER (onValue)
+// 8. FIREBASE REALTIME LISTENER
 // ═══════════════════════════════════════════════════════
 
 function initListeners() {
@@ -259,23 +268,20 @@ function initListeners() {
 }
 
 // ═══════════════════════════════════════════════════════
-// 9. SPA ROUTING — BOTTOM NAVIGATION
+// 9. SPA ROUTING
 // ═══════════════════════════════════════════════════════
 
 function navigate(viewName) {
   state.currentView = viewName;
 
-  // Views
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   const target = document.getElementById(`view-${viewName}`);
   if (target) target.classList.add("active");
 
-  // Nav-Items
   document.querySelectorAll(".nav-item").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.view === viewName);
   });
 
-  // Header-Titel + Aktion
   const titles = {
     calendar: "Kalender",
     projects: "Projekte",
@@ -290,23 +296,21 @@ function navigate(viewName) {
 // ═══════════════════════════════════════════════════════
 
 function renderCalendar() {
-  const grid   = document.getElementById("calendar-grid");
-  const label  = document.getElementById("cal-month-label");
-  const d      = state.currentDate;
-  const yr     = d.getFullYear();
-  const mo     = d.getMonth();
+  const grid  = document.getElementById("calendar-grid");
+  const label = document.getElementById("cal-month-label");
+  const d     = state.currentDate;
+  const yr    = d.getFullYear();
+  const mo    = d.getMonth();
 
   label.textContent = formatMonthYear(d);
 
-  // Erster Tag des Monats → Wochentag (Mo=0 … So=6)
   const firstDay = new Date(yr, mo, 1);
-  let startOffset = firstDay.getDay() - 1; // JS: 0=So
+  let startOffset = firstDay.getDay() - 1;
   if (startOffset < 0) startOffset = 6;
 
   const daysInMonth = new Date(yr, mo + 1, 0).getDate();
   const daysInPrev  = new Date(yr, mo, 0).getDate();
 
-  // Events-Index: date-string → array
   const evDates = new Set(
     Object.values(state.events).map(e => e.date).filter(Boolean)
   );
@@ -314,34 +318,24 @@ function renderCalendar() {
   let html = "";
   let cellCount = 0;
 
-  // Vormonat auffüllen
   for (let i = startOffset - 1; i >= 0; i--) {
-    const day = daysInPrev - i;
-    html += `<div class="cal-day other-month"><span class="cal-day-num">${day}</span></div>`;
+    html += `<div class="cal-day other-month"><span class="cal-day-num">${daysInPrev - i}</span></div>`;
     cellCount++;
   }
 
-  // Aktueller Monat
   for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = `${yr}-${String(mo+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    const dateStr    = `${yr}-${String(mo+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
     const isToday    = dateStr === today();
     const isSelected = dateStr === state.selectedDate;
     const hasEvent   = evDates.has(dateStr);
 
-    const classes = [
-      "cal-day",
-      isToday    ? "today"    : "",
-      isSelected ? "selected" : "",
-      hasEvent   ? "has-event": ""
-    ].filter(Boolean).join(" ");
+    const classes = ["cal-day", isToday ? "today" : "", isSelected ? "selected" : "", hasEvent ? "has-event" : ""]
+      .filter(Boolean).join(" ");
 
-    html += `<div class="${classes}" data-date="${dateStr}">
-      <span class="cal-day-num">${day}</span>
-    </div>`;
+    html += `<div class="${classes}" data-date="${dateStr}"><span class="cal-day-num">${day}</span></div>`;
     cellCount++;
   }
 
-  // Nächster Monat auffüllen bis 42 Zellen (6 Wochen)
   let nextDay = 1;
   while (cellCount < 42) {
     html += `<div class="cal-day other-month"><span class="cal-day-num">${nextDay++}</span></div>`;
@@ -350,7 +344,6 @@ function renderCalendar() {
 
   grid.innerHTML = html;
 
-  // Click-Handler auf Tage
   grid.querySelectorAll(".cal-day[data-date]").forEach(el => {
     el.addEventListener("click", () => {
       state.selectedDate = el.dataset.date;
@@ -365,7 +358,6 @@ function renderCalendar() {
 function renderWeekStrip() {
   const strip = document.getElementById("week-strip");
   const sel   = new Date(state.selectedDate + "T00:00:00");
-  // Woche (Mo–So) um das gewählte Datum
   const dow   = sel.getDay() === 0 ? 6 : sel.getDay() - 1;
   const mon   = new Date(sel);
   mon.setDate(sel.getDate() - dow);
@@ -375,14 +367,14 @@ function renderWeekStrip() {
 
   let html = "";
   for (let i = 0; i < 7; i++) {
-    const d = new Date(mon);
+    const d   = new Date(mon);
     d.setDate(mon.getDate() + i);
-    const ds  = toDateString(d);
-    const isT = ds === today();
+    const ds    = toDateString(d);
+    const isT   = ds === today();
     const isSel = ds === state.selectedDate;
     const hasEv = evDates.has(ds);
 
-    html += `<div class="week-day-item ${isT?"today":""} ${isSel?"selected":""}" data-date="${ds}">
+    html += `<div class="week-day-item ${isT ? "today" : ""} ${isSel ? "selected" : ""}" data-date="${ds}">
       <span class="week-day-name">${dayNames[i]}</span>
       <span class="week-day-num">${d.getDate()}</span>
       ${hasEv ? '<span class="event-dot"></span>' : '<span style="height:4px"></span>'}
@@ -393,17 +385,12 @@ function renderWeekStrip() {
   strip.querySelectorAll(".week-day-item").forEach(el => {
     el.addEventListener("click", () => {
       state.selectedDate = el.dataset.date;
-      // Monat anpassen falls nötig
       const clicked = new Date(el.dataset.date + "T00:00:00");
-      if (
-        clicked.getMonth() !== state.currentDate.getMonth() ||
-        clicked.getFullYear() !== state.currentDate.getFullYear()
-      ) {
+      if (clicked.getMonth() !== state.currentDate.getMonth() ||
+          clicked.getFullYear() !== state.currentDate.getFullYear()) {
         state.currentDate = new Date(clicked.getFullYear(), clicked.getMonth(), 1);
-        renderCalendar();
-      } else {
-        renderCalendar();
       }
+      renderCalendar();
       renderWeekStrip();
       renderDayEvents();
       renderTodayTodos();
@@ -412,9 +399,9 @@ function renderWeekStrip() {
 }
 
 function renderDayEvents() {
-  const list = document.getElementById("day-event-list");
+  const list  = document.getElementById("day-event-list");
   const title = document.getElementById("day-events-title");
-  const sd = state.selectedDate;
+  const sd    = state.selectedDate;
   title.textContent = sd === today() ? "Heute" : formatDate(sd);
 
   const dayEvents = Object.entries(state.events)
@@ -451,8 +438,7 @@ function renderDayEvents() {
 
 function renderTodayTodos() {
   const list = document.getElementById("today-todo-list");
-  const t    = today();
-  const due  = toArray(state.todos).filter(td => td.dueDate === t && !td.done);
+  const due  = toArray(state.todos).filter(td => td.dueDate === today() && !td.done);
 
   if (!due.length) {
     list.innerHTML = `<li class="empty-state">Keine offenen Aufgaben für heute.</li>`;
@@ -507,13 +493,12 @@ function attachTodoHandlers(container) {
 }
 
 function renderTodoList() {
-  const list = document.getElementById("todo-list");
-  let items  = toArray(state.todos);
+  const list  = document.getElementById("todo-list");
+  let items   = toArray(state.todos);
 
-  if (state.todoFilter === "open")  items = items.filter(t => !t.done);
-  if (state.todoFilter === "done")  items = items.filter(t => t.done);
+  if (state.todoFilter === "open") items = items.filter(t => !t.done);
+  if (state.todoFilter === "done") items = items.filter(t =>  t.done);
 
-  // Sortierung: offen zuerst, dann nach Priorität
   const pOrder = { high: 0, medium: 1, low: 2 };
   items.sort((a, b) => {
     if (a.done !== b.done) return a.done ? 1 : -1;
@@ -533,9 +518,8 @@ function renderTodoList() {
 // ═══════════════════════════════════════════════════════
 
 function renderNotesList() {
-  const grid = document.getElementById("notes-grid");
-  const notes = toArray(state.notes)
-    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const grid  = document.getElementById("notes-grid");
+  const notes = toArray(state.notes).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
   if (!notes.length) {
     grid.innerHTML = `<div class="empty-state">Noch keine Notizen.</div>`;
@@ -580,9 +564,8 @@ function attachNoteHandlers(container) {
 // ═══════════════════════════════════════════════════════
 
 function renderProjectGrid() {
-  const grid = document.getElementById("project-grid");
-  const projects = toArray(state.projects)
-    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const grid     = document.getElementById("project-grid");
+  const projects = toArray(state.projects).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
   if (!projects.length) {
     grid.innerHTML = `<div class="empty-state" style="grid-column:span 2">Noch keine Projekte. Erstelle dein erstes!</div>`;
@@ -616,9 +599,8 @@ function openProjectDetail(projectId) {
 
 function renderProjectDetail() {
   if (!state.activeProjectId) return;
-  const id    = state.activeProjectId;
+  const id = state.activeProjectId;
 
-  // To-Dos des Projekts
   const pTodos = toArray(state.todos).filter(t => t.projectId === id);
   const tList  = document.getElementById("project-todo-list");
   if (!pTodos.length) {
@@ -628,7 +610,6 @@ function renderProjectDetail() {
     attachTodoHandlers(tList);
   }
 
-  // Notizen des Projekts
   const pNotes = toArray(state.notes).filter(n => n.projectId === id);
   const nGrid  = document.getElementById("project-notes-grid");
   if (!pNotes.length) {
@@ -644,8 +625,7 @@ function renderProjectDetail() {
 // ═══════════════════════════════════════════════════════
 
 function populateProjectSelects() {
-  const selects = ["todo-project", "note-project"];
-  selects.forEach(id => {
+  ["todo-project", "note-project"].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
     const current = sel.value;
@@ -664,44 +644,24 @@ function populateProjectSelects() {
 // 15. MODAL MANAGEMENT
 // ═══════════════════════════════════════════════════════
 
-function openModal(id) {
-  document.getElementById(id).classList.add("open");
-}
-function closeModal(id) {
-  document.getElementById(id).classList.remove("open");
-}
-function closeAllModals() {
-  document.querySelectorAll(".modal-overlay.open").forEach(m => m.classList.remove("open"));
-}
+function openModal(id)    { document.getElementById(id).classList.add("open"); }
+function closeModal(id)   { document.getElementById(id).classList.remove("open"); }
+function closeAllModals() { document.querySelectorAll(".modal-overlay.open").forEach(m => m.classList.remove("open")); }
 
-// Schließen bei Klick auf Overlay (außerhalb des Sheets)
 document.querySelectorAll(".modal-overlay").forEach(overlay => {
-  overlay.addEventListener("click", e => {
-    if (e.target === overlay) closeAllModals();
-  });
+  overlay.addEventListener("click", e => { if (e.target === overlay) closeAllModals(); });
 });
 
 // ═══════════════════════════════════════════════════════
-// 16. HEADER AKTION (kontextabhängiger + Button)
+// 16. HEADER AKTION
 // ═══════════════════════════════════════════════════════
 
 document.getElementById("header-action-btn").addEventListener("click", () => {
-  const modalMap = {
-    calendar: "modal-event",
-    projects: "modal-project",
-    todos:    "modal-todo",
-    notes:    "modal-note"
-  };
+  const modalMap = { calendar: "modal-event", projects: "modal-project", todos: "modal-todo", notes: "modal-note" };
   const m = modalMap[state.currentView];
   if (!m) return;
-
-  // Datum vorbelegen
-  if (state.currentView === "calendar") {
-    document.getElementById("event-date").value = state.selectedDate;
-  }
-  if (state.currentView === "todos") {
-    document.getElementById("todo-date").value = today();
-  }
+  if (state.currentView === "calendar") document.getElementById("event-date").value = state.selectedDate;
+  if (state.currentView === "todos")    document.getElementById("todo-date").value  = today();
   openModal(m);
 });
 
@@ -713,9 +673,7 @@ document.getElementById("add-event-btn").addEventListener("click", () => {
   document.getElementById("event-date").value = state.selectedDate;
   openModal("modal-event");
 });
-
 document.getElementById("cancel-event-btn").addEventListener("click", () => closeModal("modal-event"));
-
 document.getElementById("save-event-btn").addEventListener("click", async () => {
   const title = document.getElementById("event-title").value.trim();
   const date  = document.getElementById("event-date").value;
@@ -725,7 +683,6 @@ document.getElementById("save-event-btn").addEventListener("click", async () => 
   if (!date)  { showToast("Bitte Datum wählen");   return; }
   await createEvent({ title, date, time, description: desc });
   closeModal("modal-event");
-  // Felder leeren
   ["event-title","event-time","event-desc"].forEach(id => document.getElementById(id).value = "");
 });
 
@@ -734,7 +691,6 @@ document.getElementById("save-event-btn").addEventListener("click", async () => 
 // ═══════════════════════════════════════════════════════
 
 document.getElementById("cancel-todo-btn").addEventListener("click", () => closeModal("modal-todo"));
-
 document.getElementById("save-todo-btn").addEventListener("click", async () => {
   const title     = document.getElementById("todo-title").value.trim();
   const dueDate   = document.getElementById("todo-date").value;
@@ -743,8 +699,7 @@ document.getElementById("save-todo-btn").addEventListener("click", async () => {
   if (!title) { showToast("Bitte Aufgabe eingeben"); return; }
   await createTodo({ title, dueDate, priority, projectId });
   closeModal("modal-todo");
-  document.getElementById("todo-title").value = "";
-  document.getElementById("todo-date").value  = "";
+  ["todo-title","todo-date"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("todo-project").value = "";
 });
 
@@ -753,7 +708,6 @@ document.getElementById("save-todo-btn").addEventListener("click", async () => {
 // ═══════════════════════════════════════════════════════
 
 document.getElementById("cancel-note-btn").addEventListener("click", () => closeModal("modal-note"));
-
 document.getElementById("save-note-btn").addEventListener("click", async () => {
   const title     = document.getElementById("note-title").value.trim();
   const content   = document.getElementById("note-content").value.trim();
@@ -761,8 +715,7 @@ document.getElementById("save-note-btn").addEventListener("click", async () => {
   if (!title && !content) { showToast("Bitte Inhalt eingeben"); return; }
   await createNote({ title, content, projectId });
   closeModal("modal-note");
-  document.getElementById("note-title").value   = "";
-  document.getElementById("note-content").value = "";
+  ["note-title","note-content"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("note-project").value = "";
 });
 
@@ -770,7 +723,6 @@ document.getElementById("save-note-btn").addEventListener("click", async () => {
 // 20. PROJEKT MODAL
 // ═══════════════════════════════════════════════════════
 
-// Farbauswahl
 document.getElementById("color-picker").addEventListener("click", e => {
   const dot = e.target.closest(".color-dot");
   if (!dot) return;
@@ -778,9 +730,7 @@ document.getElementById("color-picker").addEventListener("click", e => {
   dot.classList.add("selected");
   state.selectedProjectColor = dot.dataset.color;
 });
-
 document.getElementById("cancel-project-btn").addEventListener("click", () => closeModal("modal-project"));
-
 document.getElementById("save-project-btn").addEventListener("click", async () => {
   const name = document.getElementById("project-name").value.trim();
   if (!name) { showToast("Bitte Projektname eingeben"); return; }
@@ -797,7 +747,6 @@ document.getElementById("close-project-detail-btn").addEventListener("click", ()
   closeModal("modal-project-detail");
   state.activeProjectId = null;
 });
-
 document.getElementById("delete-project-btn").addEventListener("click", async () => {
   if (!state.activeProjectId) return;
   await deleteProject(state.activeProjectId);
@@ -825,19 +774,16 @@ document.querySelectorAll(".filter-chip").forEach(chip => {
 document.getElementById("cal-prev").addEventListener("click", () => {
   const d = state.currentDate;
   state.currentDate = new Date(d.getFullYear(), d.getMonth() - 1, 1);
-  renderCalendar();
-  renderWeekStrip();
+  renderCalendar(); renderWeekStrip();
 });
-
 document.getElementById("cal-next").addEventListener("click", () => {
   const d = state.currentDate;
   state.currentDate = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-  renderCalendar();
-  renderWeekStrip();
+  renderCalendar(); renderWeekStrip();
 });
 
 // ═══════════════════════════════════════════════════════
-// 24. BOTTOM NAV LISTENER
+// 24. BOTTOM NAV
 // ═══════════════════════════════════════════════════════
 
 document.querySelectorAll(".nav-item").forEach(btn => {
@@ -845,28 +791,27 @@ document.querySelectorAll(".nav-item").forEach(btn => {
 });
 
 // ═══════════════════════════════════════════════════════
-// 25. XSS-SCHUTZ
-// ═══════════════════════════════════════════════════════
-
-function escHtml(str) {
-  if (!str) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-// ═══════════════════════════════════════════════════════
-// 26. APP START
+// 25. APP START — Anonyme Auth → dann Listener starten
 // ═══════════════════════════════════════════════════════
 
 function init() {
   renderCalendar();
   renderWeekStrip();
   navigate("calendar");
-  initListeners();
+
+  // Anonyme Anmeldung: falls bereits eine Session existiert,
+  // feuert onAuthStateChanged sofort; sonst wird signInAnonymously aufgerufen.
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      // Bereits angemeldet (auch anonym) — Listener starten
+      initListeners();
+    } else {
+      // Noch keine Session → anonym anmelden
+      signInAnonymously(auth).catch(e => {
+        showToast("Auth-Fehler: " + e.message);
+      });
+    }
+  });
 }
 
 init();

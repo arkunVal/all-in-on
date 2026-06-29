@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <title>All-in-One</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ===== APP SHELL ===== -->
+  <div id="app">
+
+    <!-- TOP HEADER -->
+    <header id="app-header">
+      <div class="header-left">
+        <span id="header-title">Kalender</span>
+      </div>
+      <div class="header-right">
+        <button id="header-action-btn" class="icon-btn" aria-label="Hinzufügen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT AREA -->
+    <main id="main-content">
+
+      <!-- ===== VIEW: KALENDER (DASHBOARD) ===== -->
+      <section id="view-calendar" class="view active">
+        <!-- Mini-Wochenstreifen -->
+        <div class="week-strip-wrapper">
+          <div class="week-strip" id="week-strip"></div>
+        </div>
+
+        <!-- Monatsansicht -->
+        <div class="calendar-card">
+          <div class="calendar-nav">
+            <button id="cal-prev" class="nav-arrow" aria-label="Vormonat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span id="cal-month-label" class="month-label"></span>
+            <button id="cal-next" class="nav-arrow" aria-label="Nächster Monat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+          </div>
+          <div class="calendar-grid" id="calendar-grid"></div>
+        </div>
+
+        <!-- Events des gewählten Tages -->
+        <div class="section-header">
+          <span class="section-title" id="day-events-title">Heute</span>
+          <button class="text-btn" id="add-event-btn">+ Event</button>
+        </div>
+        <ul class="event-list" id="day-event-list">
+          <li class="empty-state">Keine Events für diesen Tag.</li>
+        </ul>
+
+        <!-- Anstehende Aufgaben für heute -->
+        <div class="section-header">
+          <span class="section-title">Aufgaben heute</span>
+        </div>
+        <ul class="todo-list" id="today-todo-list">
+          <li class="empty-state">Keine Aufgaben für heute.</li>
+        </ul>
+      </section>
+
+      <!-- ===== VIEW: PROJEKTE ===== -->
+      <section id="view-projects" class="view">
+        <div class="project-grid" id="project-grid">
+          <div class="empty-state">Noch keine Projekte. Erstelle dein erstes!</div>
+        </div>
+      </section>
+
+      <!-- ===== VIEW: TO-DOS ===== -->
+      <section id="view-todos" class="view">
+        <!-- Filter -->
+        <div class="filter-bar">
+          <button class="filter-chip active" data-filter="all">Alle</button>
+          <button class="filter-chip" data-filter="open">Offen</button>
+          <button class="filter-chip" data-filter="done">Erledigt</button>
+        </div>
+        <ul class="todo-list" id="todo-list">
+          <li class="empty-state">Keine To-Dos vorhanden.</li>
+        </ul>
+      </section>
+
+      <!-- ===== VIEW: NOTIZEN ===== -->
+      <section id="view-notes" class="view">
+        <div class="notes-grid" id="notes-grid">
+          <div class="empty-state">Noch keine Notizen.</div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- BOTTOM NAVIGATION -->
+    <nav id="bottom-nav">
+      <button class="nav-item active" data-view="calendar" aria-label="Kalender">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span class="nav-label">Kalender</span>
+      </button>
+      <button class="nav-item" data-view="projects" aria-label="Projekte">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span class="nav-label">Projekte</span>
+      </button>
+      <button class="nav-item" data-view="todos" aria-label="To-Dos">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+        </svg>
+        <span class="nav-label">To-Dos</span>
+      </button>
+      <button class="nav-item" data-view="notes" aria-label="Notizen">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <span class="nav-label">Notizen</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ===== MODALS ===== -->
+
+  <!-- Modal: Event erstellen -->
+  <div id="modal-event" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Event erstellen">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Event erstellen</h2>
+      <div class="form-group">
+        <label class="form-label" for="event-title">Titel</label>
+        <input class="form-input" id="event-title" type="text" placeholder="Event-Titel" autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label class="form-label" for="event-date">Datum</label>
+          <input class="form-input" id="event-date" type="date" />
+        </div>
+        <div class="form-group flex-1">
+          <label class="form-label" for="event-time">Uhrzeit</label>
+          <input class="form-input" id="event-time" type="time" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="event-desc">Beschreibung (optional)</label>
+        <textarea class="form-input form-textarea" id="event-desc" placeholder="Details..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancel-event-btn">Abbrechen</button>
+        <button class="btn btn-primary" id="save-event-btn">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: To-Do erstellen -->
+  <div id="modal-todo" class="modal-overlay" role="dialog" aria-modal="true" aria-label="To-Do erstellen">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">To-Do erstellen</h2>
+      <div class="form-group">
+        <label class="form-label" for="todo-title">Aufgabe</label>
+        <input class="form-input" id="todo-title" type="text" placeholder="Was muss erledigt werden?" autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label class="form-label" for="todo-date">Fällig am</label>
+          <input class="form-input" id="todo-date" type="date" />
+        </div>
+        <div class="form-group flex-1">
+          <label class="form-label" for="todo-priority">Priorität</label>
+          <select class="form-input form-select" id="todo-priority">
+            <option value="low">Niedrig</option>
+            <option value="medium" selected>Mittel</option>
+            <option value="high">Hoch</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="todo-project">Projekt (optional)</label>
+        <select class="form-input form-select" id="todo-project">
+          <option value="">— Kein Projekt —</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancel-todo-btn">Abbrechen</button>
+        <button class="btn btn-primary" id="save-todo-btn">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Notiz erstellen -->
+  <div id="modal-note" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Notiz erstellen">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Notiz erstellen</h2>
+      <div class="form-group">
+        <label class="form-label" for="note-title">Titel</label>
+        <input class="form-input" id="note-title" type="text" placeholder="Notiz-Titel" autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="note-content">Inhalt</label>
+        <textarea class="form-input form-textarea large" id="note-content" placeholder="Deine Gedanken..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="note-project">Projekt (optional)</label>
+        <select class="form-input form-select" id="note-project">
+          <option value="">— Kein Projekt —</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancel-note-btn">Abbrechen</button>
+        <button class="btn btn-primary" id="save-note-btn">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Projekt erstellen -->
+  <div id="modal-project" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Projekt erstellen">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Projekt erstellen</h2>
+      <div class="form-group">
+        <label class="form-label" for="project-name">Projektname</label>
+        <input class="form-input" id="project-name" type="text" placeholder="z.B. Finanzen, Haushalt…" autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Farbe</label>
+        <div class="color-picker" id="color-picker">
+          <button class="color-dot selected" data-color="#6C63FF" style="background:#6C63FF" aria-label="Violett"></button>
+          <button class="color-dot" data-color="#FF6584" style="background:#FF6584" aria-label="Pink"></button>
+          <button class="color-dot" data-color="#43D9AD" style="background:#43D9AD" aria-label="Grün"></button>
+          <button class="color-dot" data-color="#F7B731" style="background:#F7B731" aria-label="Gelb"></button>
+          <button class="color-dot" data-color="#4ECDC4" style="background:#4ECDC4" aria-label="Türkis"></button>
+          <button class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B" aria-label="Rot"></button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancel-project-btn">Abbrechen</button>
+        <button class="btn btn-primary" id="save-project-btn">Erstellen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Projekt-Detail -->
+  <div id="modal-project-detail" class="modal-overlay fullscreen" role="dialog" aria-modal="true">
+    <div class="modal-sheet fullscreen">
+      <div class="modal-nav">
+        <button class="icon-btn" id="close-project-detail-btn" aria-label="Zurück">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="modal-title inline" id="project-detail-title">Projekt</h2>
+        <button class="icon-btn danger" id="delete-project-btn" aria-label="Projekt löschen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+      </div>
+      <div class="project-detail-content" id="project-detail-content">
+        <div class="section-header"><span class="section-title">To-Dos</span></div>
+        <ul class="todo-list" id="project-todo-list"></ul>
+        <div class="section-header"><span class="section-title">Notizen</span></div>
+        <div class="notes-grid" id="project-notes-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast-Benachrichtigung -->
+  <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
+
+  <!-- Firebase SDKs (v10 modular via CDN) -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>

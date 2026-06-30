@@ -132,21 +132,7 @@
           <button class="text-btn" id="edit-today-checkin-btn">Bearbeiten</button>
         </div>
         <div class="today-stats-grid" id="today-stats-grid"></div>
-
-        <!-- Schnell-Erfassung -->
-        <div class="section-header">
-          <span class="section-title">Schnell erfassen</span>
-        </div>
-        <div class="quick-add-row">
-          <button class="quick-add-btn" id="quick-water-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
-            <span>+250ml Wasser</span>
-          </button>
-          <button class="quick-add-btn" id="quick-coffee-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-            <span>+80mg Koffein</span>
-          </button>
-        </div>
+        <p class="stats-hint">Tippe auf „Bearbeiten", um Flüssigkeit und Koffein schnell zu erfassen.</p>
 
         <!-- Verletzungen / Krankheit -->
         <div class="section-header">
@@ -466,8 +452,15 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="checkin-sleep-hours">Schlafdauer (Stunden)</label>
-        <input class="form-input" id="checkin-sleep-hours" type="number" inputmode="decimal" step="0.25" placeholder="z.B. 7.5" />
+        <label class="form-label">Schlafdauer</label>
+        <div class="form-row" style="margin-bottom:0">
+          <div class="form-group flex-1">
+            <input class="form-input" id="checkin-sleep-h" type="number" inputmode="numeric" min="0" max="23" step="1" placeholder="Std" />
+          </div>
+          <div class="form-group flex-1">
+            <input class="form-input" id="checkin-sleep-m" type="number" inputmode="numeric" min="0" max="59" step="5" placeholder="Min" />
+          </div>
+        </div>
       </div>
 
       <div class="form-group">
@@ -492,8 +485,15 @@
         <input class="form-input" id="edit-weight" type="number" inputmode="decimal" step="0.1" placeholder="z.B. 72.4" />
       </div>
       <div class="form-group">
-        <label class="form-label" for="edit-sleep-hours">Schlafdauer (Stunden)</label>
-        <input class="form-input" id="edit-sleep-hours" type="number" inputmode="decimal" step="0.25" placeholder="z.B. 7.5" />
+        <label class="form-label">Schlafdauer</label>
+        <div class="form-row" style="margin-bottom:0">
+          <div class="form-group flex-1">
+            <input class="form-input" id="edit-sleep-h" type="number" inputmode="numeric" min="0" max="23" step="1" placeholder="Std" />
+          </div>
+          <div class="form-group flex-1">
+            <input class="form-input" id="edit-sleep-m" type="number" inputmode="numeric" min="0" max="59" step="5" placeholder="Min" />
+          </div>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label" for="edit-sleep-quality">Schlafqualität: <span id="edit-sleep-quality-val">75</span> / 100</label>
@@ -502,10 +502,20 @@
       <div class="form-group">
         <label class="form-label" for="edit-water">Flüssigkeit (ml)</label>
         <input class="form-input" id="edit-water" type="number" inputmode="numeric" step="50" placeholder="z.B. 2000" />
+        <div class="quick-chip-row" id="water-quick-chips">
+          <button type="button" class="quick-chip" data-field="water" data-amount="250">+250ml</button>
+          <button type="button" class="quick-chip" data-field="water" data-amount="500">+500ml</button>
+          <button type="button" class="quick-chip" data-field="water" data-amount="-250">−250ml</button>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label" for="edit-caffeine">Koffein (mg)</label>
         <input class="form-input" id="edit-caffeine" type="number" inputmode="numeric" step="10" placeholder="z.B. 160" />
+        <div class="quick-chip-row" id="caffeine-quick-chips">
+          <button type="button" class="quick-chip" data-field="caffeine" data-amount="80">+80mg (Espresso)</button>
+          <button type="button" class="quick-chip" data-field="caffeine" data-amount="40">+40mg (Tee)</button>
+          <button type="button" class="quick-chip" data-field="caffeine" data-amount="-40">−40mg</button>
+        </div>
       </div>
 
       <div class="modal-actions">

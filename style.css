@@ -11,9 +11,9 @@
   --bg-4:       #2e2e2e;
   --border:     #2a2a2a;
   --border-mid: #363636;
-  --text-0:     #f0f0f0;
-  --text-1:     #a0a0a0;
-  --text-2:     #606060;
+  --text-0:     #ffffff;
+  --text-1:     #b8b8b8;
+  --text-2:     #7a7a7a;
   --accent:     #6C63FF;
   --accent-dim: rgba(108,99,255,0.15);
   --accent-mid: rgba(108,99,255,0.35);
@@ -929,6 +929,42 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 .stat-card-value.empty { color: var(--text-2); font-size: var(--text-base); font-weight: 500; }
 .stat-card.full-width { grid-column: span 2; }
 
+.stats-hint {
+  font-size: var(--text-xs);
+  color: var(--text-2);
+  margin-bottom: var(--space-lg);
+  margin-top: -8px;
+}
+
+/* Quick-Chips: nur sichtbar wenn zugehöriges Feld fokussiert ist (Punkt 2) */
+.quick-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-sm);
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height var(--transition-base) ease, opacity var(--transition-base) ease, margin-top var(--transition-base) ease;
+}
+.quick-chip-row.visible {
+  max-height: 60px;
+  opacity: 1;
+}
+.quick-chip {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent-mid);
+  border-radius: var(--radius-full);
+  padding: 6px 12px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+  white-space: nowrap;
+}
+.quick-chip:active { background: var(--accent-mid); transform: scale(0.95); }
+
 /* Schlafqualitäts-Balken in der Karte */
 .quality-bar-track {
   width: 100%; height: 6px;
@@ -942,32 +978,6 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
   border-radius: var(--radius-full);
   transition: width var(--transition-base) ease;
 }
-
-/* Quick-Add Buttons */
-.quick-add-row {
-  display: flex;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-lg);
-}
-.quick-add-btn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-md) var(--space-sm);
-  color: var(--text-0);
-  cursor: pointer;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  text-align: center;
-  transition: background var(--transition-fast), transform var(--transition-fast);
-}
-.quick-add-btn svg { width: 22px; height: 22px; color: var(--accent); }
-.quick-add-btn:active { background: var(--bg-3); transform: scale(0.96); }
 
 /* Range Slider (Schlafqualität) */
 .range-input {

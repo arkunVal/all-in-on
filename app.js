@@ -115,6 +115,30 @@ function formatDate(str) {
 function formatMonthYear(date) {
   return date.toLocaleString("de-DE", { month: "long", year: "numeric" });
 }
+
+// ── Punkt 1: Schlafdauer als Stunden+Minuten statt Dezimalzahl ──
+
+/** Stunden (Ganzzahl) + Minuten (0-59) → Dezimalstunden, z.B. 7h 30min → 7.5 */
+function hmToDecimalHours(h, m) {
+  const hh = Number(h) || 0;
+  const mm = Number(m) || 0;
+  return Math.round((hh + mm / 60) * 100) / 100;
+}
+
+/** Dezimalstunden → { h, m }, z.B. 7.5 → { h: 7, m: 30 } */
+function decimalHoursToHM(decimal) {
+  if (decimal === undefined || decimal === null || decimal === "") return { h: "", m: "" };
+  const totalMinutes = Math.round(Number(decimal) * 60);
+  return { h: Math.floor(totalMinutes / 60), m: totalMinutes % 60 };
+}
+
+/** Dezimalstunden → Anzeige-String, z.B. 7.5 → "7h 30min" */
+function formatSleepDuration(decimal) {
+  if (decimal === undefined || decimal === null || decimal === "") return "";
+  const { h, m } = decimalHoursToHM(decimal);
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}min`;
+}
 let toastTimer = null;
 function showToast(msg) {
   const el = document.getElementById("toast");
@@ -351,11 +375,11 @@ async function saveCheckin(dateStr, data) {
   } catch (e) { showToast("Fehler beim Speichern: " + e.message); }
 }
 
-/** Addiert einen Wert zu einem bestehenden Feld im heutigen Check-in (für Schnell-Erfassung) */
-async function incrementCheckinField(field, amount) {
-  const t = today();
-  const current = state.checkins[t]?.[field] || 0;
-  await saveCheckin(t, { [field]: current + amount });
+/** Addiert einen Wert direkt im offenen Eingabefeld (Quick-Chips im Bearbeiten-Modal) */
+function bumpFieldValue(inputEl, amount) {
+  const current = Number(inputEl.value) || 0;
+  const next = Math.max(0, current + amount);
+  inputEl.value = next;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -898,7 +922,7 @@ function renderTodayStats() {
     <div class="stat-card">
       <div class="stat-card-label">😴 Schlaf</div>
       ${hasSleep
-        ? `<div class="stat-card-value">${c.sleepHours}<span class="unit">Std</span></div>`
+        ? `<div class="stat-card-value">${formatSleepDuration(c.sleepHours)}</div>`
         : `<div class="stat-card-value empty">—</div>`}
     </div>
     <div class="stat-card full-width">
@@ -919,14 +943,35 @@ function renderTodayStats() {
   `;
 }
 
-document.getElementById("quick-water-btn").addEventListener("click", () => incrementCheckinField("water", 250));
-document.getElementById("quick-coffee-btn").addEventListener("click", () => incrementCheckinField("caffeine", 80));
+// Punkt 2: Quick-Chips nur zeigen, wenn das zugehörige Feld fokussiert ist
+const waterInput = document.getElementById("edit-water");
+const caffeineInput = document.getElementById("edit-caffeine");
+const waterChips = document.getElementById("water-quick-chips");
+const caffeineChips = document.getElementById("caffeine-quick-chips");
+
+waterInput.addEventListener("focus", () => waterChips.classList.add("visible"));
+caffeineInput.addEventListener("focus", () => caffeineChips.classList.add("visible"));
+// Beim Verlassen des Feldes wieder verstecken (kurze Verzögerung, damit Klick auf Chip noch ankommt)
+waterInput.addEventListener("blur", () => setTimeout(() => waterChips.classList.remove("visible"), 150));
+caffeineInput.addEventListener("blur", () => setTimeout(() => caffeineChips.classList.remove("visible"), 150));
+
+document.querySelectorAll(".quick-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const field = chip.dataset.field;
+    const amount = Number(chip.dataset.amount);
+    const targetInput = field === "water" ? waterInput : caffeineInput;
+    bumpFieldValue(targetInput, amount);
+    targetInput.focus();
+  });
+});
 
 document.getElementById("edit-today-checkin-btn").addEventListener("click", () => {
   const t = today();
   const c = state.checkins[t] || {};
   document.getElementById("edit-weight").value = c.weight ?? "";
-  document.getElementById("edit-sleep-hours").value = c.sleepHours ?? "";
+  const { h, m } = decimalHoursToHM(c.sleepHours);
+  document.getElementById("edit-sleep-h").value = h;
+  document.getElementById("edit-sleep-m").value = m;
   const q = c.sleepQuality ?? 75;
   document.getElementById("edit-sleep-quality").value = q;
   document.getElementById("edit-sleep-quality-val").textContent = q;
@@ -943,14 +988,16 @@ document.getElementById("cancel-edit-checkin-btn").addEventListener("click", () 
 
 document.getElementById("save-edit-checkin-btn").addEventListener("click", async () => {
   const weight = document.getElementById("edit-weight").value;
-  const sleepHours = document.getElementById("edit-sleep-hours").value;
+  const sleepH = document.getElementById("edit-sleep-h").value;
+  const sleepM = document.getElementById("edit-sleep-m").value;
+  const hasSleepInput = sleepH !== "" || sleepM !== "";
   const sleepQuality = document.getElementById("edit-sleep-quality").value;
   const water = document.getElementById("edit-water").value;
   const caffeine = document.getElementById("edit-caffeine").value;
 
   await saveCheckin(today(), {
     weight:       weight === "" ? null : Number(weight),
-    sleepHours:   sleepHours === "" ? null : Number(sleepHours),
+    sleepHours:   hasSleepInput ? hmToDecimalHours(sleepH, sleepM) : null,
     sleepQuality: sleepQuality === "" ? null : Number(sleepQuality),
     water:        water === "" ? 0 : Number(water),
     caffeine:     caffeine === "" ? 0 : Number(caffeine)
@@ -974,7 +1021,7 @@ function renderWeightHistory() {
     <li class="history-item">
       <span class="history-date">${formatDate(dateStr)}</span>
       <div class="history-values">
-        ${(c.sleepHours !== undefined && c.sleepHours !== null) ? `<span class="history-sleep">😴 ${c.sleepHours}h</span>` : ""}
+        ${(c.sleepHours !== undefined && c.sleepHours !== null) ? `<span class="history-sleep">😴 ${formatSleepDuration(c.sleepHours)}</span>` : ""}
         <span class="history-weight">${c.weight} kg</span>
       </div>
     </li>
@@ -1477,15 +1524,16 @@ document.getElementById("checkin-sleep-quality").addEventListener("input", (e) =
 
 document.getElementById("save-checkin-btn").addEventListener("click", async () => {
   const weight = document.getElementById("checkin-weight").value;
-  const sleepHours = document.getElementById("checkin-sleep-hours").value;
+  const sleepH = document.getElementById("checkin-sleep-h").value;
+  const sleepM = document.getElementById("checkin-sleep-m").value;
   const sleepQuality = document.getElementById("checkin-sleep-quality").value;
 
   if (!weight) { showToast("Bitte Gewicht eingeben"); shakeModal("modal-checkin"); return; }
-  if (!sleepHours) { showToast("Bitte Schlafdauer eingeben"); shakeModal("modal-checkin"); return; }
+  if (sleepH === "" && sleepM === "") { showToast("Bitte Schlafdauer eingeben"); shakeModal("modal-checkin"); return; }
 
   await saveCheckin(today(), {
     weight: Number(weight),
-    sleepHours: Number(sleepHours),
+    sleepHours: hmToDecimalHours(sleepH, sleepM),
     sleepQuality: Number(sleepQuality)
   });
 
@@ -1499,7 +1547,8 @@ function runMorningFlow() {
   if (!hasTodayCheckin()) {
     // Felder zurücksetzen / Defaults setzen
     document.getElementById("checkin-weight").value = "";
-    document.getElementById("checkin-sleep-hours").value = "";
+    document.getElementById("checkin-sleep-h").value = "";
+    document.getElementById("checkin-sleep-m").value = "";
     document.getElementById("checkin-sleep-quality").value = 75;
     document.getElementById("checkin-sleep-quality-val").textContent = "75";
     openModal("modal-checkin");

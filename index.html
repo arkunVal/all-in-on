@@ -6,8 +6,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="All-in-One" />
   <meta name="theme-color" content="#0a0a0a" />
   <title>All-in-One</title>
+
+  <!-- Punkt 1: App-Icons -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
+
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -343,6 +351,24 @@
         </button>
       </div>
       <ul class="calendar-list" id="calendar-list"></ul>
+    </div>
+  </div>
+
+  <!-- Modal: Lösch-Bestätigung (Punkt 2) -->
+  <div id="modal-confirm" class="modal-overlay confirm-overlay" role="alertdialog" aria-modal="true">
+    <div class="confirm-sheet">
+      <div class="confirm-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </div>
+      <h2 class="confirm-title" id="confirm-title">Wirklich löschen?</h2>
+      <p class="confirm-text" id="confirm-text">Diese Aktion kann nicht rückgängig gemacht werden.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="confirm-cancel-btn">Abbrechen</button>
+        <button class="btn btn-danger" id="confirm-delete-btn">Löschen</button>
+      </div>
     </div>
   </div>
 

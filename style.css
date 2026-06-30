@@ -679,6 +679,31 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 .btn:active { transform: scale(0.96); opacity: 0.85; }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-ghost   { background: var(--bg-3); color: var(--text-1); border: 1px solid var(--border); }
+.btn-danger  { background: var(--danger); color: #fff; }
+
+/* ── LÖSCH-BESTÄTIGUNG (Punkt 2) ── */
+.confirm-overlay { align-items: center; padding: var(--space-lg); }
+.confirm-sheet {
+  background: var(--bg-2);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl) var(--space-lg) var(--space-lg);
+  width: 100%; max-width: 340px;
+  text-align: center;
+  animation: popIn var(--transition-slow) cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: var(--shadow-lg);
+}
+.confirm-icon {
+  width: 56px; height: 56px;
+  margin: 0 auto var(--space-md);
+  border-radius: var(--radius-full);
+  background: rgba(255,77,77,0.12);
+  color: var(--danger);
+  display: flex; align-items: center; justify-content: center;
+}
+.confirm-icon svg { width: 26px; height: 26px; }
+.confirm-title { font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--space-sm); }
+.confirm-text  { font-size: var(--text-sm); color: var(--text-1); line-height: 1.5; margin-bottom: var(--space-lg); }
 
 /* ── PROJEKT DETAIL ── */
 .project-detail-content { padding-bottom: var(--space-xl); }
@@ -704,6 +729,86 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
   white-space: nowrap; max-width: 90vw;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ═══════════════════════════════════════════
+   ANIMATIONEN (Punkt 3)
+   ═══════════════════════════════════════════ */
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.85) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes popOut {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.9); }
+}
+@keyframes itemIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes itemOut {
+  from { opacity: 1; max-height: 200px; transform: scale(1); margin-bottom: var(--space-sm); }
+  to   { opacity: 0; max-height: 0; transform: scale(0.9); margin-bottom: 0; padding-top: 0; padding-bottom: 0; }
+}
+@keyframes checkPulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+@keyframes navBounce {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(0.82); }
+  100% { transform: scale(1); }
+}
+@keyframes viewFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-6px); }
+  40%      { transform: translateX(6px); }
+  60%      { transform: translateX(-4px); }
+  80%      { transform: translateX(4px); }
+}
+@keyframes dotPop {
+  from { opacity: 0; transform: scale(0); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Karten/Listen-Items: sanftes Einblenden beim Erscheinen */
+.event-item, .todo-item, .note-card, .project-card, .calendar-list-item {
+  animation: itemIn var(--transition-base) ease backwards;
+}
+/* Gestaffelte Verzögerung für die ersten Elemente einer Liste */
+.event-list > *:nth-child(1), .todo-list > *:nth-child(1), .notes-grid > *:nth-child(1), .project-grid > *:nth-child(1) { animation-delay: 0ms; }
+.event-list > *:nth-child(2), .todo-list > *:nth-child(2), .notes-grid > *:nth-child(2), .project-grid > *:nth-child(2) { animation-delay: 30ms; }
+.event-list > *:nth-child(3), .todo-list > *:nth-child(3), .notes-grid > *:nth-child(3), .project-grid > *:nth-child(3) { animation-delay: 60ms; }
+.event-list > *:nth-child(4), .todo-list > *:nth-child(4), .notes-grid > *:nth-child(4), .project-grid > *:nth-child(4) { animation-delay: 90ms; }
+.event-list > *:nth-child(n+5), .todo-list > *:nth-child(n+5), .notes-grid > *:nth-child(n+5), .project-grid > *:nth-child(n+5) { animation-delay: 110ms; }
+
+/* Element wird entfernt (vor dem DOM-Removal kurz antriggern) */
+.item-removing { animation: itemOut var(--transition-base) ease forwards !important; pointer-events: none; overflow: hidden; }
+
+/* Checkbox: Pulse beim Abhaken */
+.todo-checkbox.checked { animation: checkPulse 320ms ease; }
+
+/* Bottom-Nav Icons: Bounce bei Auswahl */
+.nav-item.nav-bounce .nav-icon { animation: navBounce 320ms ease; }
+
+/* View-Wechsel: sanftes Einblenden */
+.view.active { animation: viewFadeIn var(--transition-base) ease; }
+
+/* Modal-Shake bei Validierungsfehler */
+.modal-sheet.shake { animation: shake 380ms ease; }
+
+/* Event-/Kalender-Punkte: Pop-In */
+.cal-day-dots .event-dot, .event-dots .event-dot { animation: dotPop 250ms ease backwards; }
+
+/* Buttons: weicher Press-Effekt schon vorhanden über transform; ergänzend Ripple-freier Tap-Flash */
+.btn-primary:active, .btn-danger:active { filter: brightness(0.9); }
+
+/* Toast nutzt bereits eine eigene Transition (siehe .toast.show oben) */
 
 /* ── RESPONSIVE ── */
 @media (min-width: 768px) {

@@ -90,6 +90,37 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove("show"), 2800);
 }
+
+// ── PUNKT 2: Lösch-Bestätigung ──
+let pendingDeleteAction = null;
+
+/**
+ * Öffnet ein Bestätigungs-Modal. onConfirm wird nur ausgeführt,
+ * wenn der Nutzer aktiv auf "Löschen" tippt.
+ */
+function confirmDelete({ title = "Wirklich löschen?", text = "Diese Aktion kann nicht rückgängig gemacht werden.", onConfirm }) {
+  document.getElementById("confirm-title").textContent = title;
+  document.getElementById("confirm-text").textContent = text;
+  pendingDeleteAction = onConfirm;
+  openModal("modal-confirm");
+}
+
+/** Entfernt ein Listen-Element optisch (Animation), bevor es aus dem DOM verschwindet */
+function animateRemoval(el, callback) {
+  if (!el) { callback?.(); return; }
+  el.classList.add("item-removing");
+  setTimeout(() => callback?.(), 260);
+}
+
+/** Schüttelt ein Modal-Sheet kurz, um auf einen Validierungsfehler hinzuweisen */
+function shakeModal(modalId) {
+  const sheet = document.querySelector(`#${modalId} .modal-sheet`);
+  if (!sheet) return;
+  sheet.classList.remove("shake");
+  void sheet.offsetWidth; // Reflow erzwingen, damit die Animation neu startet
+  sheet.classList.add("shake");
+  setTimeout(() => sheet.classList.remove("shake"), 400);
+}
 function toArray(obj) {
   if (!obj) return [];
   return Object.entries(obj).map(([id, val]) => ({ ...val, id }));
@@ -463,7 +494,17 @@ function renderDayEvents() {
   }).join("");
 
   list.querySelectorAll(".delete-btn").forEach(btn => {
-    btn.addEventListener("click", () => deleteEvent(btn.dataset.id));
+    btn.addEventListener("click", () => {
+      const ev = state.events[btn.dataset.id];
+      confirmDelete({
+        title: "Event löschen?",
+        text: ev?.title ? `"${ev.title}" wird endgültig gelöscht.` : "Dieses Event wird endgültig gelöscht.",
+        onConfirm: () => {
+          const li = btn.closest("li");
+          animateRemoval(li, () => deleteEvent(btn.dataset.id));
+        }
+      });
+    });
   });
 }
 
@@ -538,7 +579,17 @@ function renderCalendarManageList() {
     </li>
   `).join("");
   list.querySelectorAll(".delete-btn").forEach(btn => {
-    btn.addEventListener("click", () => deleteCalendar(btn.dataset.id));
+    btn.addEventListener("click", () => {
+      const cal = state.calendars[btn.dataset.id];
+      confirmDelete({
+        title: "Kalender löschen?",
+        text: cal?.name ? `"${cal.name}" wird gelöscht. Zugehörige Events bleiben erhalten, verlieren aber die Zuordnung.` : "Dieser Kalender wird gelöscht.",
+        onConfirm: () => {
+          const li = btn.closest("li");
+          animateRemoval(li, () => deleteCalendar(btn.dataset.id));
+        }
+      });
+    });
   });
 }
 
@@ -582,7 +633,15 @@ function attachTodoHandlers(container) {
   container.querySelectorAll(".delete-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      deleteTodo(btn.dataset.id);
+      const td = state.todos[btn.dataset.id];
+      confirmDelete({
+        title: "To-Do löschen?",
+        text: td?.title ? `"${td.title}" wird endgültig gelöscht.` : "Dieses To-Do wird endgültig gelöscht.",
+        onConfirm: () => {
+          const li = btn.closest("li");
+          animateRemoval(li, () => deleteTodo(btn.dataset.id));
+        }
+      });
     });
   });
   // Punkt 2: Klick auf Zeile klappt Beschreibung auf/zu (falls vorhanden)
@@ -657,7 +716,18 @@ function buildNoteCard(n) {
 
 function attachNoteHandlers(container) {
   container.querySelectorAll(".delete-btn").forEach(btn => {
-    btn.addEventListener("click", (e) => { e.stopPropagation(); deleteNote(btn.dataset.id); });
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const n = state.notes[btn.dataset.id];
+      confirmDelete({
+        title: "Notiz löschen?",
+        text: n?.title ? `"${n.title}" wird endgültig gelöscht.` : "Diese Notiz wird endgültig gelöscht.",
+        onConfirm: () => {
+          const card = btn.closest(".note-card");
+          animateRemoval(card, () => deleteNote(btn.dataset.id));
+        }
+      });
+    });
   });
 }
 
@@ -750,6 +820,18 @@ document.querySelectorAll(".modal-overlay").forEach(overlay => {
   overlay.addEventListener("click", e => { if (e.target === overlay) closeAllModals(); });
 });
 
+// Lösch-Bestätigung: Buttons verkabeln (Punkt 2)
+document.getElementById("confirm-cancel-btn").addEventListener("click", () => {
+  pendingDeleteAction = null;
+  closeModal("modal-confirm");
+});
+document.getElementById("confirm-delete-btn").addEventListener("click", () => {
+  const action = pendingDeleteAction;
+  pendingDeleteAction = null;
+  closeModal("modal-confirm");
+  action?.();
+});
+
 // ═══════════════════════════════════════════════════════
 // 18. HEADER AKTION (+ Button)
 // ═══════════════════════════════════════════════════════
@@ -795,9 +877,9 @@ document.getElementById("save-event-btn").addEventListener("click", async () => 
   const date = document.getElementById("event-date").value;
   const time = document.getElementById("event-time").value;
   const desc = document.getElementById("event-desc").value.trim();
-  if (!title) { showToast("Bitte Titel eingeben"); return; }
-  if (!date)  { showToast("Bitte Datum wählen"); return; }
-  if (!calendarId) { showToast("Bitte Kalender wählen"); return; }
+  if (!title) { showToast("Bitte Titel eingeben"); shakeModal("modal-event"); return; }
+  if (!date)  { showToast("Bitte Datum wählen"); shakeModal("modal-event"); return; }
+  if (!calendarId) { showToast("Bitte Kalender wählen"); shakeModal("modal-event"); return; }
   await createEvent({ title, date, time, description: desc, calendarId });
   closeModal("modal-event");
   ["event-title","event-time","event-desc"].forEach(id => document.getElementById(id).value = "");
@@ -815,7 +897,7 @@ document.getElementById("save-todo-btn").addEventListener("click", async () => {
   const dueDate = document.getElementById("todo-date").value || null; // Punkt 3: optional
   const priority = document.getElementById("todo-priority").value;
   const projectId = document.getElementById("todo-project").value || null;
-  if (!title) { showToast("Bitte Aufgabe eingeben"); return; }
+  if (!title) { showToast("Bitte Aufgabe eingeben"); shakeModal("modal-todo"); return; }
   await createTodo({ title, description, dueDate, priority, projectId });
   closeModal("modal-todo");
   ["todo-title","todo-desc","todo-date"].forEach(id => document.getElementById(id).value = "");
@@ -832,7 +914,7 @@ document.getElementById("save-note-btn").addEventListener("click", async () => {
   const title = document.getElementById("note-title").value.trim();
   const content = document.getElementById("note-content").value.trim();
   const projectId = document.getElementById("note-project").value || null;
-  if (!title && !content) { showToast("Bitte Inhalt eingeben"); return; }
+  if (!title && !content) { showToast("Bitte Inhalt eingeben"); shakeModal("modal-note"); return; }
   await createNote({ title, content, projectId });
   closeModal("modal-note");
   ["note-title","note-content"].forEach(id => document.getElementById(id).value = "");
@@ -853,7 +935,7 @@ document.getElementById("color-picker").addEventListener("click", e => {
 document.getElementById("cancel-project-btn").addEventListener("click", () => closeModal("modal-project"));
 document.getElementById("save-project-btn").addEventListener("click", async () => {
   const name = document.getElementById("project-name").value.trim();
-  if (!name) { showToast("Bitte Projektname eingeben"); return; }
+  if (!name) { showToast("Bitte Projektname eingeben"); shakeModal("modal-project"); return; }
   await createProject({ name, color: state.selectedProjectColor });
   closeModal("modal-project");
   document.getElementById("project-name").value = "";
@@ -873,7 +955,7 @@ document.getElementById("cal-color-picker").addEventListener("click", e => {
 document.getElementById("cancel-calendar-btn").addEventListener("click", () => closeModal("modal-calendar"));
 document.getElementById("save-calendar-btn").addEventListener("click", async () => {
   const name = document.getElementById("calendar-name").value.trim();
-  if (!name) { showToast("Bitte Kalendernamen eingeben"); return; }
+  if (!name) { showToast("Bitte Kalendernamen eingeben"); shakeModal("modal-calendar"); return; }
   await createCalendar({ name, color: state.selectedCalendarColor });
   closeModal("modal-calendar");
   document.getElementById("calendar-name").value = "";
@@ -890,11 +972,18 @@ document.getElementById("close-project-detail-btn").addEventListener("click", ()
   closeModal("modal-project-detail");
   state.activeProjectId = null;
 });
-document.getElementById("delete-project-btn").addEventListener("click", async () => {
+document.getElementById("delete-project-btn").addEventListener("click", () => {
   if (!state.activeProjectId) return;
-  await deleteProject(state.activeProjectId);
-  closeModal("modal-project-detail");
-  state.activeProjectId = null;
+  const proj = state.projects[state.activeProjectId];
+  confirmDelete({
+    title: "Projekt löschen?",
+    text: proj?.name ? `"${proj.name}" wird gelöscht. Verknüpfte To-Dos und Notizen bleiben erhalten, verlieren aber die Zuordnung.` : "Dieses Projekt wird gelöscht.",
+    onConfirm: async () => {
+      await deleteProject(state.activeProjectId);
+      closeModal("modal-project-detail");
+      state.activeProjectId = null;
+    }
+  });
 });
 
 // ═══════════════════════════════════════════════════════
@@ -931,7 +1020,11 @@ document.getElementById("expand-toggle").addEventListener("click", toggleMonthEx
 // ═══════════════════════════════════════════════════════
 
 document.querySelectorAll(".nav-item").forEach(btn => {
-  btn.addEventListener("click", () => navigate(btn.dataset.view));
+  btn.addEventListener("click", () => {
+    navigate(btn.dataset.view);
+    btn.classList.add("nav-bounce");
+    setTimeout(() => btn.classList.remove("nav-bounce"), 350);
+  });
 });
 
 // ═══════════════════════════════════════════════════════

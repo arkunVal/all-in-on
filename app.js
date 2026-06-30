@@ -66,6 +66,30 @@ const state = {
 };
 
 // ═══════════════════════════════════════════════════════
+// 2b. SPRÜCHE FÜR TAGE OHNE TERMINE (Punkt 2)
+// ═══════════════════════════════════════════════════════
+
+const FREE_DAY_QUOTES = [
+  { text: "Ein leerer Kalender ist kein leerer Tag.", author: "" },
+  { text: "Manchmal ist das Beste, was man planen kann, nichts zu planen.", author: "" },
+  { text: "Freiraum ist auch Produktivität.", author: "" },
+  { text: "Heute gehört dir.", author: "" },
+  { text: "Die Ruhe vor dem Sturm ist auch nur Ruhe – genieß sie.", author: "" },
+  { text: "Ein Tag ohne Termine ist ein Tag voller Möglichkeiten.", author: "" },
+  { text: "Erfolg ist auch, sich bewusst Zeit zu nehmen.", author: "" },
+  { text: "Manchmal ist Nichtstun die produktivste Entscheidung.", author: "" },
+  { text: "Du musst nicht jeden Tag etwas erreichen, um wertvoll zu sein.", author: "" },
+  { text: "Genieße den freien Raum – er kommt nicht jeden Tag.", author: "" }
+];
+
+function pickDailyQuote() {
+  // Deterministisch je nach Datum, damit der Spruch über den Tag stabil bleibt
+  const seed = today().split("-").join("");
+  const idx = parseInt(seed, 10) % FREE_DAY_QUOTES.length;
+  return FREE_DAY_QUOTES[idx];
+}
+
+// ═══════════════════════════════════════════════════════
 // 3. HILFSFUNKTIONEN
 // ═══════════════════════════════════════════════════════
 
@@ -151,6 +175,62 @@ async function deleteEvent(id) {
   try { await remove(REFS.event(id)); showToast("Event gelöscht"); }
   catch (e) { showToast("Fehler beim Löschen: " + e.message); }
 }
+
+// ═══════════════════════════════════════════════════════
+// 4b. BENACHRICHTIGUNGEN — Berechtigung & Banner (Punkt 1)
+// ═══════════════════════════════════════════════════════
+
+const NOTIF_DISMISS_KEY = "allInOne_notifBannerDismissed";
+
+function notificationsSupported() {
+  return "Notification" in window && "serviceWorker" in navigator;
+}
+
+function updateNotifBanner() {
+  const banner = document.getElementById("notif-banner");
+  if (!notificationsSupported()) { banner.classList.remove("show"); return; }
+
+  const dismissed = localStorage.getItem(NOTIF_DISMISS_KEY) === "1";
+  const permission = Notification.permission; // "default" | "granted" | "denied"
+
+  if (permission === "default" && !dismissed) {
+    banner.classList.add("show");
+  } else {
+    banner.classList.remove("show");
+  }
+}
+
+async function requestNotificationPermission() {
+  if (!notificationsSupported()) {
+    showToast("Benachrichtigungen werden auf diesem Gerät nicht unterstützt");
+    return;
+  }
+  try {
+    const result = await Notification.requestPermission();
+    if (result === "granted") {
+      showToast("Benachrichtigungen aktiviert ✓");
+      // Kurzer Test-Hinweis, dass es funktioniert
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification("All-in-One", {
+          body: "Erinnerungen sind jetzt aktiv.",
+          icon: "icons/icon-192.png",
+          tag: "welcome"
+        });
+      });
+    } else {
+      showToast("Berechtigung wurde nicht erteilt");
+    }
+  } catch (e) {
+    showToast("Fehler: " + e.message);
+  }
+  updateNotifBanner();
+}
+
+document.getElementById("notif-enable-btn").addEventListener("click", requestNotificationPermission);
+document.getElementById("notif-dismiss-btn").addEventListener("click", () => {
+  localStorage.setItem(NOTIF_DISMISS_KEY, "1");
+  updateNotifBanner();
+});
 
 // ═══════════════════════════════════════════════════════
 // 5. FIREBASE CRUD — TO-DOS
@@ -482,7 +562,7 @@ function renderDayEvents() {
       <div class="event-info">
         <div class="event-title-text">${escHtml(e.title)}</div>
         ${e.description ? `<div class="event-desc-text">${escHtml(e.description)}</div>` : ""}
-        ${calName ? `<span class="event-cal-badge" style="margin-top:4px;display:inline-block">${escHtml(calName)}</span>` : ""}
+        ${calName ? `<span class="event-cal-badge" style="margin-top:4px;display:inline-block">${escHtml(calName)}${(e.reminderMinutes !== undefined && e.reminderMinutes !== null) ? " · 🔔" : ""}</span>` : ""}
       </div>
       <button class="delete-btn" data-id="${id}" aria-label="Löschen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -607,8 +687,9 @@ function buildTodoItem(td) {
         <div class="todo-info">
           <div class="todo-title-text">${escHtml(td.title)}</div>
           <div class="todo-meta">
-            ${td.dueDate ? `<span class="todo-date">${formatDate(td.dueDate)}</span>` : ""}
+            ${td.dueDate ? `<span class="todo-date">${formatDate(td.dueDate)}${td.dueTime ? " · " + td.dueTime : ""}</span>` : ""}
             ${td.priority ? `<span class="prio-badge prio-${td.priority}">${prioLabel}</span>` : ""}
+            ${(td.reminderMinutes !== undefined && td.reminderMinutes !== null) ? `<span class="prio-badge" style="color:var(--accent);background:var(--accent-dim)">🔔</span>` : ""}
           </div>
         </div>
         <button class="delete-btn" data-id="${td.id}" aria-label="Löschen">
@@ -877,10 +958,12 @@ document.getElementById("save-event-btn").addEventListener("click", async () => 
   const date = document.getElementById("event-date").value;
   const time = document.getElementById("event-time").value;
   const desc = document.getElementById("event-desc").value.trim();
+  const reminderRaw = document.getElementById("event-reminder").value;
+  const reminderMinutes = reminderRaw === "" ? null : Number(reminderRaw);
   if (!title) { showToast("Bitte Titel eingeben"); shakeModal("modal-event"); return; }
   if (!date)  { showToast("Bitte Datum wählen"); shakeModal("modal-event"); return; }
   if (!calendarId) { showToast("Bitte Kalender wählen"); shakeModal("modal-event"); return; }
-  await createEvent({ title, date, time, description: desc, calendarId });
+  await createEvent({ title, date, time, description: desc, calendarId, reminderMinutes });
   closeModal("modal-event");
   ["event-title","event-time","event-desc"].forEach(id => document.getElementById(id).value = "");
 });
@@ -895,12 +978,15 @@ document.getElementById("save-todo-btn").addEventListener("click", async () => {
   const title = document.getElementById("todo-title").value.trim();
   const description = document.getElementById("todo-desc").value.trim();
   const dueDate = document.getElementById("todo-date").value || null; // Punkt 3: optional
+  const dueTime = document.getElementById("todo-time").value || null;
   const priority = document.getElementById("todo-priority").value;
   const projectId = document.getElementById("todo-project").value || null;
+  const reminderRaw = document.getElementById("todo-reminder").value;
+  const reminderMinutes = reminderRaw === "" ? null : Number(reminderRaw);
   if (!title) { showToast("Bitte Aufgabe eingeben"); shakeModal("modal-todo"); return; }
-  await createTodo({ title, description, dueDate, priority, projectId });
+  await createTodo({ title, description, dueDate, dueTime, priority, projectId, reminderMinutes });
   closeModal("modal-todo");
-  ["todo-title","todo-desc","todo-date"].forEach(id => document.getElementById(id).value = "");
+  ["todo-title","todo-desc","todo-date","todo-time"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("todo-project").value = "";
 });
 
@@ -1028,17 +1114,112 @@ document.querySelectorAll(".nav-item").forEach(btn => {
 });
 
 // ═══════════════════════════════════════════════════════
-// 28. APP START — Anonyme Auth → dann Listener starten
+// 28b. MORGEN-BRIEFING (Punkt 2)
 // ═══════════════════════════════════════════════════════
+
+const BRIEFING_LAST_SHOWN_KEY = "allInOne_briefingLastShown";
+
+function shouldShowBriefingToday() {
+  const lastShown = localStorage.getItem(BRIEFING_LAST_SHOWN_KEY);
+  return lastShown !== today();
+}
+
+function buildBriefingHTML() {
+  const t = today();
+
+  // Events von heute (alle Kalender)
+  const todayEvents = Object.values(state.events)
+    .filter(e => e.date === t)
+    .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+
+  // Offene To-Dos, die heute fällig sind
+  const todayTodos = toArray(state.todos)
+    .filter(td => td.dueDate === t && !td.done)
+    .sort((a, b) => (a.dueTime || "").localeCompare(b.dueTime || ""));
+
+  const hasAnything = todayEvents.length > 0 || todayTodos.length > 0;
+
+  if (!hasAnything) {
+    const quote = pickDailyQuote();
+    return `
+      <div class="briefing-quote">
+        <div class="briefing-quote-text">„${escHtml(quote.text)}"</div>
+        ${quote.author ? `<div class="briefing-quote-author">${escHtml(quote.author)}</div>` : `<div class="briefing-quote-author">Heute steht nichts an — genieß den freien Tag.</div>`}
+      </div>`;
+  }
+
+  let html = "";
+
+  if (todayEvents.length) {
+    html += `<div class="briefing-section">
+      <div class="briefing-section-label">Termine heute</div>
+      ${todayEvents.map(e => `
+        <div class="briefing-row">
+          <span class="briefing-dot" style="background:${calColor(e.calendarId)}"></span>
+          <span class="briefing-row-text">${escHtml(e.title)}</span>
+          <span class="briefing-row-time">${e.time || ""}</span>
+        </div>
+      `).join("")}
+    </div>`;
+  }
+
+  if (todayTodos.length) {
+    const pColor = { high: "var(--prio-high)", medium: "var(--prio-medium)", low: "var(--prio-low)" };
+    html += `<div class="briefing-section">
+      <div class="briefing-section-label">Aufgaben heute</div>
+      ${todayTodos.map(td => `
+        <div class="briefing-row">
+          <span class="briefing-dot" style="background:${pColor[td.priority] || 'var(--accent)'}"></span>
+          <span class="briefing-row-text">${escHtml(td.title)}</span>
+          <span class="briefing-row-time">${td.dueTime || ""}</span>
+        </div>
+      `).join("")}
+    </div>`;
+  }
+
+  return html;
+}
+
+function showMorningBriefing() {
+  const now = new Date();
+  const dateLabel = now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
+  document.getElementById("briefing-date").textContent = dateLabel;
+
+  const hour = now.getHours();
+  let greeting = "Guten Morgen!";
+  if (hour >= 11 && hour < 17) greeting = "Hallo!";
+  else if (hour >= 17) greeting = "Guten Abend!";
+
+  document.getElementById("briefing-greeting").textContent = greeting;
+  document.getElementById("briefing-content").innerHTML = buildBriefingHTML();
+
+  openModal("modal-briefing");
+  localStorage.setItem(BRIEFING_LAST_SHOWN_KEY, today());
+}
+
+document.getElementById("briefing-close-btn").addEventListener("click", () => closeModal("modal-briefing"));
+
+
 
 function init() {
   renderCalendar();
   renderWeekStrip();
   navigate("calendar");
+  updateNotifBanner();
 
   onAuthStateChanged(auth, user => {
     if (user) {
       initListeners();
+      // Punkt 2: Morgen-Briefing zeigen, sobald Events & To-Dos einmal geladen sind
+      // (nur beim ersten Öffnen des Tages, danach nicht mehr automatisch)
+      if (shouldShowBriefingToday()) {
+        let eventsLoaded = false, todosLoaded = false;
+        const tryShowBriefing = () => {
+          if (eventsLoaded && todosLoaded) showMorningBriefing();
+        };
+        onValue(REFS.events(), () => { eventsLoaded = true; tryShowBriefing(); }, { onlyOnce: true });
+        onValue(REFS.todos(),  () => { todosLoaded = true;  tryShowBriefing(); }, { onlyOnce: true });
+      }
     } else {
       signInAnonymously(auth).catch(e => showToast("Auth-Fehler: " + e.message));
     }

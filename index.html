@@ -188,6 +188,19 @@
         <label class="form-label" for="event-desc">Beschreibung (optional)</label>
         <textarea class="form-input form-textarea" id="event-desc" placeholder="Details..."></textarea>
       </div>
+      <!-- Punkt 1: Erinnerung wählbar -->
+      <div class="form-group">
+        <label class="form-label" for="event-reminder">Erinnerung</label>
+        <select class="form-input form-select" id="event-reminder">
+          <option value="">Keine Erinnerung</option>
+          <option value="0">Zur Startzeit</option>
+          <option value="5">5 Minuten vorher</option>
+          <option value="15" selected>15 Minuten vorher</option>
+          <option value="30">30 Minuten vorher</option>
+          <option value="60">1 Stunde vorher</option>
+          <option value="1440">1 Tag vorher</option>
+        </select>
+      </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="cancel-event-btn">Abbrechen</button>
         <button class="btn btn-primary" id="save-event-btn">Speichern</button>
@@ -210,17 +223,33 @@
         <textarea class="form-input form-textarea" id="todo-desc" placeholder="Weitere Details..."></textarea>
       </div>
       <div class="form-row">
-        <!-- Punkt 3: Datum optional (kein required) -->
         <div class="form-group flex-1">
           <label class="form-label" for="todo-date">Fällig am <span class="label-optional">(optional)</span></label>
           <input class="form-input" id="todo-date" type="date" />
         </div>
+        <div class="form-group flex-1">
+          <label class="form-label" for="todo-time">Uhrzeit <span class="label-optional">(optional)</span></label>
+          <input class="form-input" id="todo-time" type="time" />
+        </div>
+      </div>
+      <div class="form-row">
         <div class="form-group flex-1">
           <label class="form-label" for="todo-priority">Priorität</label>
           <select class="form-input form-select" id="todo-priority">
             <option value="low">Niedrig</option>
             <option value="medium" selected>Mittel</option>
             <option value="high">Hoch</option>
+          </select>
+        </div>
+        <!-- Punkt 1: Erinnerung wählbar -->
+        <div class="form-group flex-1">
+          <label class="form-label" for="todo-reminder">Erinnerung</label>
+          <select class="form-input form-select" id="todo-reminder">
+            <option value="">Keine</option>
+            <option value="0">Zur Zeit</option>
+            <option value="15">15 Min vorher</option>
+            <option value="60">1 Std vorher</option>
+            <option value="1440">1 Tag vorher</option>
           </select>
         </div>
       </div>
@@ -372,7 +401,48 @@
     </div>
   </div>
 
+  <!-- Modal: Morgen-Briefing (Punkt 2) -->
+  <div id="modal-briefing" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-sheet briefing-sheet">
+      <div class="modal-handle"></div>
+      <div class="briefing-date" id="briefing-date">Montag, 1. Januar</div>
+      <h2 class="briefing-greeting" id="briefing-greeting">Guten Morgen!</h2>
+
+      <div id="briefing-content"></div>
+
+      <button class="btn btn-primary" id="briefing-close-btn" style="width:100%; margin-top: var(--space-md)">Los geht's</button>
+    </div>
+  </div>
+
+  <!-- Banner: Benachrichtigungen aktivieren (Punkt 1) -->
+  <div id="notif-banner" class="notif-banner">
+    <div class="notif-banner-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+    </div>
+    <div class="notif-banner-text">
+      <strong>Erinnerungen aktivieren?</strong>
+      <span>Damit du Push-Benachrichtigungen für Events &amp; To-Dos bekommst.</span>
+    </div>
+    <button class="notif-banner-btn" id="notif-enable-btn">Aktivieren</button>
+    <button class="notif-banner-close" id="notif-dismiss-btn" aria-label="Schließen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
   <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
+
+  <script>
+    // Service Worker registrieren (für Hintergrund-Benachrichtigungen, Punkt 1)
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(err => {
+          console.warn("Service Worker Registrierung fehlgeschlagen:", err);
+        });
+      });
+    }
+  </script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

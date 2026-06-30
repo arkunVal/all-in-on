@@ -810,6 +810,84 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 
 /* Toast nutzt bereits eine eigene Transition (siehe .toast.show oben) */
 
+/* ── BENACHRICHTIGUNGS-BANNER (Punkt 1) ── */
+.notif-banner {
+  display: none;
+  position: fixed;
+  top: calc(var(--safe-top) + var(--space-sm));
+  left: var(--space-md);
+  right: var(--space-md);
+  z-index: 150;
+  background: var(--bg-3);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  gap: var(--space-sm);
+  align-items: flex-start;
+  box-shadow: var(--shadow-md);
+  animation: itemIn var(--transition-base) ease;
+}
+.notif-banner.show { display: flex; }
+.notif-banner-icon {
+  width: 32px; height: 32px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--accent-dim); color: var(--accent);
+}
+.notif-banner-icon svg { width: 16px; height: 16px; }
+.notif-banner-text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.notif-banner-text strong { font-size: var(--text-sm); font-weight: 700; }
+.notif-banner-text span { font-size: var(--text-xs); color: var(--text-1); line-height: 1.4; }
+.notif-banner-btn {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius-sm); padding: 6px 12px;
+  font-size: var(--text-xs); font-weight: 700; white-space: nowrap;
+  cursor: pointer; flex-shrink: 0;
+}
+.notif-banner-btn:active { opacity: 0.85; }
+.notif-banner-close {
+  background: none; border: none; color: var(--text-2);
+  cursor: pointer; padding: 2px; flex-shrink: 0;
+}
+.notif-banner-close svg { width: 16px; height: 16px; }
+
+/* ── MORGEN-BRIEFING (Punkt 2) ── */
+.briefing-sheet { text-align: left; }
+.briefing-date {
+  font-size: var(--text-xs); font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.6px; color: var(--accent); margin-bottom: 4px;
+}
+.briefing-greeting {
+  font-size: var(--text-xl); font-weight: 700;
+  letter-spacing: -0.4px; margin-bottom: var(--space-lg);
+}
+.briefing-section { margin-bottom: var(--space-md); }
+.briefing-section-label {
+  font-size: var(--text-xs); font-weight: 700; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: var(--space-sm);
+}
+.briefing-row {
+  display: flex; align-items: center; gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border);
+}
+.briefing-row:last-child { border-bottom: none; }
+.briefing-dot { width: 8px; height: 8px; border-radius: var(--radius-full); flex-shrink: 0; }
+.briefing-row-text { flex: 1; font-size: var(--text-base); }
+.briefing-row-time { font-size: var(--text-sm); color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+.briefing-quote {
+  background: var(--bg-3);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  text-align: center;
+}
+.briefing-quote-text {
+  font-size: var(--text-md); font-weight: 600; font-style: italic;
+  color: var(--text-0); line-height: 1.5; margin-bottom: var(--space-xs);
+}
+.briefing-quote-author { font-size: var(--text-xs); color: var(--text-2); }
+
 /* ── RESPONSIVE ── */
 @media (min-width: 768px) {
   #app { max-width: 430px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }

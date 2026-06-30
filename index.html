@@ -123,6 +123,50 @@
         </div>
       </section>
 
+      <!-- ===== VIEW: TRAINING ===== -->
+      <section id="view-training" class="view">
+
+        <!-- Heutiger Status -->
+        <div class="section-header">
+          <span class="section-title">Heute</span>
+          <button class="text-btn" id="edit-today-checkin-btn">Bearbeiten</button>
+        </div>
+        <div class="today-stats-grid" id="today-stats-grid"></div>
+
+        <!-- Schnell-Erfassung -->
+        <div class="section-header">
+          <span class="section-title">Schnell erfassen</span>
+        </div>
+        <div class="quick-add-row">
+          <button class="quick-add-btn" id="quick-water-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+            <span>+250ml Wasser</span>
+          </button>
+          <button class="quick-add-btn" id="quick-coffee-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+            <span>+80mg Koffein</span>
+          </button>
+        </div>
+
+        <!-- Verletzungen / Krankheit -->
+        <div class="section-header">
+          <span class="section-title">Verletzungen &amp; Krankheit</span>
+          <button class="text-btn" id="add-injury-btn">+ Eintrag</button>
+        </div>
+        <ul class="injury-list" id="injury-list">
+          <li class="empty-state">Keine Einträge.</li>
+        </ul>
+
+        <!-- Gewichtsverlauf -->
+        <div class="section-header">
+          <span class="section-title">Gewichtsverlauf</span>
+        </div>
+        <ul class="history-list" id="weight-history-list">
+          <li class="empty-state">Noch keine Einträge.</li>
+        </ul>
+
+      </section>
+
     </main>
 
     <!-- BOTTOM NAVIGATION -->
@@ -152,6 +196,14 @@
           <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
         </svg>
         <span class="nav-label">Notizen</span>
+      </button>
+      <button class="nav-item" data-view="training" aria-label="Training">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6.5 6.5l11 11"/><path d="M21 21l-1-1"/><path d="M3 3l1 1"/>
+          <path d="M18 2l4 4-2.5 2.5-4-4z"/><path d="M2 18l4 4 2.5-2.5-4-4z"/>
+          <path d="M16.5 7.5l1-1 4 4-1 1z"/><path d="M6.5 16.5l-1 1-4-4 1-1z"/>
+        </svg>
+        <span class="nav-label">Training</span>
       </button>
     </nav>
   </div>
@@ -397,6 +449,105 @@
       <div class="modal-actions">
         <button class="btn btn-ghost" id="confirm-cancel-btn">Abbrechen</button>
         <button class="btn btn-danger" id="confirm-delete-btn">Löschen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Morgen-Check-in (Pflicht: Schlaf + Gewicht) -->
+  <div id="modal-checkin" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Morgen-Check-in</h2>
+      <p class="checkin-intro">Bevor es losgeht: Wie hast du geschlafen, und wie ist dein aktuelles Gewicht?</p>
+
+      <div class="form-group">
+        <label class="form-label" for="checkin-weight">Gewicht (kg)</label>
+        <input class="form-input" id="checkin-weight" type="number" inputmode="decimal" step="0.1" placeholder="z.B. 72.4" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="checkin-sleep-hours">Schlafdauer (Stunden)</label>
+        <input class="form-input" id="checkin-sleep-hours" type="number" inputmode="decimal" step="0.25" placeholder="z.B. 7.5" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="checkin-sleep-quality">Schlafqualität: <span id="checkin-sleep-quality-val">75</span> / 100</label>
+        <input class="range-input" id="checkin-sleep-quality" type="range" min="0" max="100" value="75" />
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="save-checkin-btn" style="flex:1">Check-in speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Eintrag bearbeiten (Gewicht/Schlaf nachträglich, vom Training-Tab aus) -->
+  <div id="modal-edit-checkin" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Heutige Werte</h2>
+
+      <div class="form-group">
+        <label class="form-label" for="edit-weight">Gewicht (kg)</label>
+        <input class="form-input" id="edit-weight" type="number" inputmode="decimal" step="0.1" placeholder="z.B. 72.4" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="edit-sleep-hours">Schlafdauer (Stunden)</label>
+        <input class="form-input" id="edit-sleep-hours" type="number" inputmode="decimal" step="0.25" placeholder="z.B. 7.5" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="edit-sleep-quality">Schlafqualität: <span id="edit-sleep-quality-val">75</span> / 100</label>
+        <input class="range-input" id="edit-sleep-quality" type="range" min="0" max="100" value="75" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="edit-water">Flüssigkeit (ml)</label>
+        <input class="form-input" id="edit-water" type="number" inputmode="numeric" step="50" placeholder="z.B. 2000" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="edit-caffeine">Koffein (mg)</label>
+        <input class="form-input" id="edit-caffeine" type="number" inputmode="numeric" step="10" placeholder="z.B. 160" />
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancel-edit-checkin-btn">Abbrechen</button>
+        <button class="btn btn-primary" id="save-edit-checkin-btn">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Verletzung/Krankheit erstellen -->
+  <div id="modal-injury" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Verletzung / Krankheit</h2>
+      <div class="form-group">
+        <label class="form-label" for="injury-title">Bezeichnung</label>
+        <input class="form-input" id="injury-title" type="text" placeholder="z.B. Achillessehne, Erkältung…" autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label class="form-label" for="injury-from">Von</label>
+          <input class="form-input" id="injury-from" type="date" />
+        </div>
+        <div class="form-group flex-1">
+          <label class="form-label" for="injury-to">Bis <span class="label-optional">(optional)</span></label>
+          <input class="form-input" id="injury-to" type="date" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="injury-type">Typ</label>
+        <select class="form-input form-select" id="injury-type">
+          <option value="injury">Verletzung</option>
+          <option value="illness">Krankheit</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="injury-notes">Notizen (optional)</label>
+        <textarea class="form-input form-textarea" id="injury-notes" placeholder="Details, Behandlung, Belastbarkeit…"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancel-injury-btn">Abbrechen</button>
+        <button class="btn btn-primary" id="save-injury-btn">Speichern</button>
       </div>
     </div>
   </div>

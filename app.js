@@ -40,7 +40,12 @@ const REFS = {
   projects:  () => ref(db, "projects"),
   project:   (id) => ref(db, `projects/${id}`),
   calendars: () => ref(db, "calendars"),
-  calendar:  (id) => ref(db, `calendars/${id}`)
+  calendar:  (id) => ref(db, `calendars/${id}`),
+  // Training-Tracking: ein Eintrag pro Tag, Schlüssel = Datum "YYYY-MM-DD"
+  checkins:  () => ref(db, "checkins"),
+  checkin:   (dateStr) => ref(db, `checkins/${dateStr}`),
+  injuries:  () => ref(db, "injuries"),
+  injury:    (id) => ref(db, `injuries/${id}`)
 };
 
 // ═══════════════════════════════════════════════════════
@@ -62,7 +67,11 @@ const state = {
   activeProjectId:      null,
   selectedProjectColor: "#6C63FF",
   selectedCalendarColor:"#6C63FF",
-  openTodoIds:          new Set() // welche To-Do-Beschreibungen aufgeklappt sind
+  openTodoIds:          new Set(), // welche To-Do-Beschreibungen aufgeklappt sind
+  // Training-Tracking
+  checkins:             {},  // { "YYYY-MM-DD": { weight, sleepHours, sleepQuality, water, caffeine } }
+  injuries:             {},
+  openInjuryIds:        new Set()
 };
 
 // ═══════════════════════════════════════════════════════
@@ -331,6 +340,41 @@ async function deleteCalendar(id) {
 }
 
 // ═══════════════════════════════════════════════════════
+// 8b. FIREBASE CRUD — TRAINING: CHECK-INS (Schlaf, Gewicht, Flüssigkeit, Koffein)
+// ═══════════════════════════════════════════════════════
+
+/** Ein Check-in pro Tag. set() mit merge-Verhalten über update(), damit Teil-Updates möglich sind. */
+async function saveCheckin(dateStr, data) {
+  try {
+    await update(REFS.checkin(dateStr), { ...data, updatedAt: Date.now() });
+    showToast("Gespeichert ✓");
+  } catch (e) { showToast("Fehler beim Speichern: " + e.message); }
+}
+
+/** Addiert einen Wert zu einem bestehenden Feld im heutigen Check-in (für Schnell-Erfassung) */
+async function incrementCheckinField(field, amount) {
+  const t = today();
+  const current = state.checkins[t]?.[field] || 0;
+  await saveCheckin(t, { [field]: current + amount });
+}
+
+// ═══════════════════════════════════════════════════════
+// 8c. FIREBASE CRUD — TRAINING: VERLETZUNGEN / KRANKHEIT
+// ═══════════════════════════════════════════════════════
+
+async function createInjury(data) {
+  try {
+    const newRef = push(REFS.injuries());
+    await set(newRef, { ...data, createdAt: Date.now() });
+    showToast("Eintrag gespeichert ✓");
+  } catch (e) { showToast("Fehler beim Speichern: " + e.message); }
+}
+async function deleteInjury(id) {
+  try { await remove(REFS.injury(id)); showToast("Eintrag gelöscht"); }
+  catch (e) { showToast("Fehler beim Löschen: " + e.message); }
+}
+
+// ═══════════════════════════════════════════════════════
 // 9. FIREBASE REALTIME LISTENER
 // ═══════════════════════════════════════════════════════
 
@@ -374,6 +418,17 @@ function initListeners() {
     renderWeekStrip();
     renderDayEvents();
   });
+
+  onValue(REFS.checkins(), snap => {
+    state.checkins = snap.exists() ? snap.val() : {};
+    renderTodayStats();
+    renderWeightHistory();
+  });
+
+  onValue(REFS.injuries(), snap => {
+    state.injuries = snap.exists() ? snap.val() : {};
+    renderInjuryList();
+  });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -387,7 +442,7 @@ function navigate(viewName) {
   document.querySelectorAll(".nav-item").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.view === viewName);
   });
-  const titles = { calendar:"Kalender", projects:"Projekte", todos:"To-Dos", notes:"Notizen" };
+  const titles = { calendar:"Kalender", projects:"Projekte", todos:"To-Dos", notes:"Notizen", training:"Training" };
   document.getElementById("header-title").textContent = titles[viewName] || "";
   renderHeaderActions();
 }
@@ -813,6 +868,210 @@ function attachNoteHandlers(container) {
 }
 
 // ═══════════════════════════════════════════════════════
+// 14b. TRAINING RENDERING — Heutige Werte, Verletzungen, Verlauf
+// ═══════════════════════════════════════════════════════
+
+function qualityColor(q) {
+  if (q >= 70) return "var(--success)";
+  if (q >= 40) return "var(--warning)";
+  return "var(--danger)";
+}
+
+function renderTodayStats() {
+  const grid = document.getElementById("today-stats-grid");
+  const t = today();
+  const c = state.checkins[t] || {};
+
+  const hasWeight  = c.weight !== undefined && c.weight !== null && c.weight !== "";
+  const hasSleep   = c.sleepHours !== undefined && c.sleepHours !== null;
+  const hasQuality = c.sleepQuality !== undefined && c.sleepQuality !== null;
+  const water      = c.water || 0;
+  const caffeine   = c.caffeine || 0;
+
+  grid.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-card-label">⚖️ Gewicht</div>
+      ${hasWeight
+        ? `<div class="stat-card-value">${c.weight}<span class="unit">kg</span></div>`
+        : `<div class="stat-card-value empty">—</div>`}
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">😴 Schlaf</div>
+      ${hasSleep
+        ? `<div class="stat-card-value">${c.sleepHours}<span class="unit">Std</span></div>`
+        : `<div class="stat-card-value empty">—</div>`}
+    </div>
+    <div class="stat-card full-width">
+      <div class="stat-card-label">💤 Schlafqualität</div>
+      ${hasQuality
+        ? `<div class="stat-card-value">${c.sleepQuality}<span class="unit">/ 100</span></div>
+           <div class="quality-bar-track"><div class="quality-bar-fill" style="width:${c.sleepQuality}%;background:${qualityColor(c.sleepQuality)}"></div></div>`
+        : `<div class="stat-card-value empty">Noch nicht erfasst</div>`}
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">💧 Flüssigkeit</div>
+      <div class="stat-card-value">${water}<span class="unit">ml</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">☕ Koffein</div>
+      <div class="stat-card-value">${caffeine}<span class="unit">mg</span></div>
+    </div>
+  `;
+}
+
+document.getElementById("quick-water-btn").addEventListener("click", () => incrementCheckinField("water", 250));
+document.getElementById("quick-coffee-btn").addEventListener("click", () => incrementCheckinField("caffeine", 80));
+
+document.getElementById("edit-today-checkin-btn").addEventListener("click", () => {
+  const t = today();
+  const c = state.checkins[t] || {};
+  document.getElementById("edit-weight").value = c.weight ?? "";
+  document.getElementById("edit-sleep-hours").value = c.sleepHours ?? "";
+  const q = c.sleepQuality ?? 75;
+  document.getElementById("edit-sleep-quality").value = q;
+  document.getElementById("edit-sleep-quality-val").textContent = q;
+  document.getElementById("edit-water").value = c.water ?? "";
+  document.getElementById("edit-caffeine").value = c.caffeine ?? "";
+  openModal("modal-edit-checkin");
+});
+
+document.getElementById("edit-sleep-quality").addEventListener("input", (e) => {
+  document.getElementById("edit-sleep-quality-val").textContent = e.target.value;
+});
+
+document.getElementById("cancel-edit-checkin-btn").addEventListener("click", () => closeModal("modal-edit-checkin"));
+
+document.getElementById("save-edit-checkin-btn").addEventListener("click", async () => {
+  const weight = document.getElementById("edit-weight").value;
+  const sleepHours = document.getElementById("edit-sleep-hours").value;
+  const sleepQuality = document.getElementById("edit-sleep-quality").value;
+  const water = document.getElementById("edit-water").value;
+  const caffeine = document.getElementById("edit-caffeine").value;
+
+  await saveCheckin(today(), {
+    weight:       weight === "" ? null : Number(weight),
+    sleepHours:   sleepHours === "" ? null : Number(sleepHours),
+    sleepQuality: sleepQuality === "" ? null : Number(sleepQuality),
+    water:        water === "" ? 0 : Number(water),
+    caffeine:     caffeine === "" ? 0 : Number(caffeine)
+  });
+  closeModal("modal-edit-checkin");
+});
+
+function renderWeightHistory() {
+  const list = document.getElementById("weight-history-list");
+  const entries = Object.entries(state.checkins)
+    .filter(([, c]) => c.weight !== undefined && c.weight !== null && c.weight !== "")
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, 30);
+
+  if (!entries.length) {
+    list.innerHTML = `<li class="empty-state">Noch keine Gewichtseinträge.</li>`;
+    return;
+  }
+
+  list.innerHTML = entries.map(([dateStr, c]) => `
+    <li class="history-item">
+      <span class="history-date">${formatDate(dateStr)}</span>
+      <div class="history-values">
+        ${(c.sleepHours !== undefined && c.sleepHours !== null) ? `<span class="history-sleep">😴 ${c.sleepHours}h</span>` : ""}
+        <span class="history-weight">${c.weight} kg</span>
+      </div>
+    </li>
+  `).join("");
+}
+
+// ── Verletzungen / Krankheit ──
+
+function injuryStatus(inj) {
+  const t = today();
+  if (!inj.to) return "active"; // kein Enddatum = noch aktiv
+  return inj.to >= t ? "active" : "resolved";
+}
+
+function renderInjuryList() {
+  const list = document.getElementById("injury-list");
+  const items = toArray(state.injuries).sort((a, b) => (b.from || "").localeCompare(a.from || ""));
+
+  if (!items.length) {
+    list.innerHTML = `<li class="empty-state">Keine Einträge.</li>`;
+    return;
+  }
+
+  list.innerHTML = items.map(inj => {
+    const status = injuryStatus(inj);
+    const isOpen = state.openInjuryIds.has(inj.id);
+    const typeLabel = inj.type === "illness" ? "Krankheit" : "Verletzung";
+    const dateRange = inj.to ? `${formatDate(inj.from)} – ${formatDate(inj.to)}` : `seit ${formatDate(inj.from)}`;
+    return `
+      <li class="injury-item ${status}" data-id="${inj.id}">
+        <div class="injury-row" data-toggle-injury="${inj.id}">
+          <div class="injury-info">
+            <div class="injury-title-text">${escHtml(inj.title)}</div>
+            <div class="injury-meta">
+              <span class="injury-dates">${dateRange}</span>
+              <span class="injury-badge ${status}">${status === "active" ? "Aktiv" : "Beendet"}</span>
+              <span class="injury-badge resolved">${typeLabel}</span>
+            </div>
+          </div>
+          <button class="delete-btn" data-id="${inj.id}" aria-label="Löschen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </button>
+        </div>
+        ${inj.notes && isOpen ? `<div class="injury-notes-text">${escHtml(inj.notes)}</div>` : ""}
+      </li>`;
+  }).join("");
+
+  list.querySelectorAll(".delete-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const inj = state.injuries[btn.dataset.id];
+      confirmDelete({
+        title: "Eintrag löschen?",
+        text: inj?.title ? `"${inj.title}" wird endgültig gelöscht.` : "Dieser Eintrag wird endgültig gelöscht.",
+        onConfirm: () => {
+          const li = btn.closest("li");
+          animateRemoval(li, () => deleteInjury(btn.dataset.id));
+        }
+      });
+    });
+  });
+
+  list.querySelectorAll("[data-toggle-injury]").forEach(row => {
+    row.addEventListener("click", (e) => {
+      if (e.target.closest(".delete-btn")) return;
+      const id = row.dataset.toggleInjury;
+      const inj = state.injuries[id];
+      if (!inj || !inj.notes) return;
+      if (state.openInjuryIds.has(id)) state.openInjuryIds.delete(id);
+      else state.openInjuryIds.add(id);
+      renderInjuryList();
+    });
+  });
+}
+
+document.getElementById("add-injury-btn").addEventListener("click", () => {
+  document.getElementById("injury-from").value = today();
+  openModal("modal-injury");
+});
+document.getElementById("cancel-injury-btn").addEventListener("click", () => closeModal("modal-injury"));
+document.getElementById("save-injury-btn").addEventListener("click", async () => {
+  const title = document.getElementById("injury-title").value.trim();
+  const from = document.getElementById("injury-from").value;
+  const to = document.getElementById("injury-to").value || null;
+  const type = document.getElementById("injury-type").value;
+  const notes = document.getElementById("injury-notes").value.trim();
+  if (!title) { showToast("Bitte Bezeichnung eingeben"); shakeModal("modal-injury"); return; }
+  if (!from)  { showToast("Bitte Startdatum wählen"); shakeModal("modal-injury"); return; }
+  await createInjury({ title, from, to, type, notes });
+  closeModal("modal-injury");
+  ["injury-title","injury-from","injury-to","injury-notes"].forEach(id => document.getElementById(id).value = "");
+});
+
+// ═══════════════════════════════════════════════════════
 // 15. PROJEKT RENDERING
 // ═══════════════════════════════════════════════════════
 
@@ -1199,7 +1458,55 @@ function showMorningBriefing() {
 
 document.getElementById("briefing-close-btn").addEventListener("click", () => closeModal("modal-briefing"));
 
+// ═══════════════════════════════════════════════════════
+// 28c. PFLICHT-CHECK-IN (Schlaf + Gewicht) — läuft VOR dem Briefing
+// ═══════════════════════════════════════════════════════
 
+/** Prüft, ob für heute bereits Gewicht UND Schlafdauer erfasst wurden */
+function hasTodayCheckin() {
+  const c = state.checkins[today()];
+  if (!c) return false;
+  const hasWeight = c.weight !== undefined && c.weight !== null && c.weight !== "";
+  const hasSleep  = c.sleepHours !== undefined && c.sleepHours !== null && c.sleepHours !== "";
+  return hasWeight && hasSleep;
+}
+
+document.getElementById("checkin-sleep-quality").addEventListener("input", (e) => {
+  document.getElementById("checkin-sleep-quality-val").textContent = e.target.value;
+});
+
+document.getElementById("save-checkin-btn").addEventListener("click", async () => {
+  const weight = document.getElementById("checkin-weight").value;
+  const sleepHours = document.getElementById("checkin-sleep-hours").value;
+  const sleepQuality = document.getElementById("checkin-sleep-quality").value;
+
+  if (!weight) { showToast("Bitte Gewicht eingeben"); shakeModal("modal-checkin"); return; }
+  if (!sleepHours) { showToast("Bitte Schlafdauer eingeben"); shakeModal("modal-checkin"); return; }
+
+  await saveCheckin(today(), {
+    weight: Number(weight),
+    sleepHours: Number(sleepHours),
+    sleepQuality: Number(sleepQuality)
+  });
+
+  closeModal("modal-checkin");
+  // Direkt im Anschluss das Briefing zeigen
+  showMorningBriefing();
+});
+
+/** Orchestriert: erst Pflicht-Check-in (falls nötig), danach Morgen-Briefing */
+function runMorningFlow() {
+  if (!hasTodayCheckin()) {
+    // Felder zurücksetzen / Defaults setzen
+    document.getElementById("checkin-weight").value = "";
+    document.getElementById("checkin-sleep-hours").value = "";
+    document.getElementById("checkin-sleep-quality").value = 75;
+    document.getElementById("checkin-sleep-quality-val").textContent = "75";
+    openModal("modal-checkin");
+  } else {
+    showMorningBriefing();
+  }
+}
 
 function init() {
   renderCalendar();
@@ -1210,15 +1517,16 @@ function init() {
   onAuthStateChanged(auth, user => {
     if (user) {
       initListeners();
-      // Punkt 2: Morgen-Briefing zeigen, sobald Events & To-Dos einmal geladen sind
+      // Morgen-Flow: zeigen, sobald Events, To-Dos UND Check-ins einmal geladen sind
       // (nur beim ersten Öffnen des Tages, danach nicht mehr automatisch)
       if (shouldShowBriefingToday()) {
-        let eventsLoaded = false, todosLoaded = false;
-        const tryShowBriefing = () => {
-          if (eventsLoaded && todosLoaded) showMorningBriefing();
+        let eventsLoaded = false, todosLoaded = false, checkinsLoaded = false;
+        const tryRunFlow = () => {
+          if (eventsLoaded && todosLoaded && checkinsLoaded) runMorningFlow();
         };
-        onValue(REFS.events(), () => { eventsLoaded = true; tryShowBriefing(); }, { onlyOnce: true });
-        onValue(REFS.todos(),  () => { todosLoaded = true;  tryShowBriefing(); }, { onlyOnce: true });
+        onValue(REFS.events(),   () => { eventsLoaded = true;   tryRunFlow(); }, { onlyOnce: true });
+        onValue(REFS.todos(),    () => { todosLoaded = true;    tryRunFlow(); }, { onlyOnce: true });
+        onValue(REFS.checkins(), () => { checkinsLoaded = true; tryRunFlow(); }, { onlyOnce: true });
       }
     } else {
       signInAnonymously(auth).catch(e => showToast("Auth-Fehler: " + e.message));

@@ -2,7 +2,8 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- Punkt 1: Zoom deaktivieren -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#0a0a0a" />
@@ -11,7 +12,6 @@
 </head>
 <body>
 
-  <!-- ===== APP SHELL ===== -->
   <div id="app">
 
     <!-- TOP HEADER -->
@@ -19,26 +19,22 @@
       <div class="header-left">
         <span id="header-title">Kalender</span>
       </div>
-      <div class="header-right">
+      <div class="header-right" id="header-right">
         <button id="header-action-btn" class="icon-btn" aria-label="Hinzufügen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
       </div>
     </header>
 
-    <!-- MAIN CONTENT AREA -->
     <main id="main-content">
 
-      <!-- ===== VIEW: KALENDER (DASHBOARD) ===== -->
+      <!-- ===== VIEW: KALENDER ===== -->
       <section id="view-calendar" class="view active">
-        <!-- Mini-Wochenstreifen -->
-        <div class="week-strip-wrapper">
-          <div class="week-strip" id="week-strip"></div>
-        </div>
 
-        <!-- Monatsansicht -->
-        <div class="calendar-card">
-          <div class="calendar-nav">
+        <!-- Punkt 4: Wochenstreifen oben, Monat aufklappbar -->
+        <div class="cal-header-block">
+          <!-- Monat + Navigation (nur sichtbar wenn aufgeklappt) -->
+          <div class="cal-month-nav" id="cal-month-nav">
             <button id="cal-prev" class="nav-arrow" aria-label="Vormonat">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
@@ -47,10 +43,32 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
           </div>
-          <div class="calendar-weekdays">
+
+          <!-- Wochentag-Labels + Wochenstreifen (immer sichtbar) -->
+          <div class="week-day-labels">
             <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
           </div>
-          <div class="calendar-grid" id="calendar-grid"></div>
+          <div class="week-strip" id="week-strip"></div>
+
+          <!-- Aufklapp-Button -->
+          <button class="expand-toggle" id="expand-toggle" aria-label="Monat anzeigen">
+            <svg id="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+
+          <!-- Aufklappbarer Monatskalender -->
+          <div class="month-expand" id="month-expand">
+            <div class="calendar-weekdays">
+              <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+            </div>
+            <div class="calendar-grid" id="calendar-grid"></div>
+          </div>
+        </div>
+
+        <!-- Punkt 5: Kalender-Filter-Leiste -->
+        <div class="cal-filter-bar" id="cal-filter-bar">
+          <button class="cal-filter-chip active" data-cal-id="all">Alle</button>
         </div>
 
         <!-- Events des gewählten Tages -->
@@ -62,7 +80,7 @@
           <li class="empty-state">Keine Events für diesen Tag.</li>
         </ul>
 
-        <!-- Anstehende Aufgaben für heute -->
+        <!-- Aufgaben heute -->
         <div class="section-header">
           <span class="section-title">Aufgaben heute</span>
         </div>
@@ -80,7 +98,6 @@
 
       <!-- ===== VIEW: TO-DOS ===== -->
       <section id="view-todos" class="view">
-        <!-- Filter -->
         <div class="filter-bar">
           <button class="filter-chip active" data-filter="all">Alle</button>
           <button class="filter-chip" data-filter="open">Offen</button>
@@ -134,13 +151,20 @@
   <!-- ===== MODALS ===== -->
 
   <!-- Modal: Event erstellen -->
-  <div id="modal-event" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Event erstellen">
+  <div id="modal-event" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <h2 class="modal-title">Event erstellen</h2>
       <div class="form-group">
         <label class="form-label" for="event-title">Titel</label>
         <input class="form-input" id="event-title" type="text" placeholder="Event-Titel" autocomplete="off" />
+      </div>
+      <!-- Punkt 5: Kalender-Auswahl im Event-Modal -->
+      <div class="form-group">
+        <label class="form-label" for="event-calendar">Kalender</label>
+        <select class="form-input form-select" id="event-calendar">
+          <option value="">— Kalender wählen —</option>
+        </select>
       </div>
       <div class="form-row">
         <div class="form-group flex-1">
@@ -163,8 +187,8 @@
     </div>
   </div>
 
-  <!-- Modal: To-Do erstellen -->
-  <div id="modal-todo" class="modal-overlay" role="dialog" aria-modal="true" aria-label="To-Do erstellen">
+  <!-- Modal: To-Do erstellen (Punkt 2 + 3) -->
+  <div id="modal-todo" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <h2 class="modal-title">To-Do erstellen</h2>
@@ -172,9 +196,15 @@
         <label class="form-label" for="todo-title">Aufgabe</label>
         <input class="form-input" id="todo-title" type="text" placeholder="Was muss erledigt werden?" autocomplete="off" />
       </div>
+      <!-- Punkt 2: Beschreibung -->
+      <div class="form-group">
+        <label class="form-label" for="todo-desc">Beschreibung (optional)</label>
+        <textarea class="form-input form-textarea" id="todo-desc" placeholder="Weitere Details..."></textarea>
+      </div>
       <div class="form-row">
+        <!-- Punkt 3: Datum optional (kein required) -->
         <div class="form-group flex-1">
-          <label class="form-label" for="todo-date">Fällig am</label>
+          <label class="form-label" for="todo-date">Fällig am <span class="label-optional">(optional)</span></label>
           <input class="form-input" id="todo-date" type="date" />
         </div>
         <div class="form-group flex-1">
@@ -200,7 +230,7 @@
   </div>
 
   <!-- Modal: Notiz erstellen -->
-  <div id="modal-note" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Notiz erstellen">
+  <div id="modal-note" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <h2 class="modal-title">Notiz erstellen</h2>
@@ -226,7 +256,7 @@
   </div>
 
   <!-- Modal: Projekt erstellen -->
-  <div id="modal-project" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Projekt erstellen">
+  <div id="modal-project" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <h2 class="modal-title">Projekt erstellen</h2>
@@ -252,6 +282,33 @@
     </div>
   </div>
 
+  <!-- Modal: Kalender erstellen (Punkt 5) -->
+  <div id="modal-calendar" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Kalender erstellen</h2>
+      <div class="form-group">
+        <label class="form-label" for="calendar-name">Name</label>
+        <input class="form-input" id="calendar-name" type="text" placeholder="z.B. Privat, Arbeit…" autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Farbe</label>
+        <div class="color-picker" id="cal-color-picker">
+          <button class="color-dot selected" data-color="#6C63FF" style="background:#6C63FF" aria-label="Violett"></button>
+          <button class="color-dot" data-color="#FF6584" style="background:#FF6584" aria-label="Pink"></button>
+          <button class="color-dot" data-color="#43D9AD" style="background:#43D9AD" aria-label="Grün"></button>
+          <button class="color-dot" data-color="#F7B731" style="background:#F7B731" aria-label="Gelb"></button>
+          <button class="color-dot" data-color="#4ECDC4" style="background:#4ECDC4" aria-label="Türkis"></button>
+          <button class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B" aria-label="Rot"></button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancel-calendar-btn">Abbrechen</button>
+        <button class="btn btn-primary" id="save-calendar-btn">Erstellen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Projekt-Detail -->
   <div id="modal-project-detail" class="modal-overlay fullscreen" role="dialog" aria-modal="true">
     <div class="modal-sheet fullscreen">
@@ -273,10 +330,23 @@
     </div>
   </div>
 
-  <!-- Toast-Benachrichtigung -->
-  <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
+  <!-- Modal: Kalender-Verwaltung (Punkt 5) -->
+  <div id="modal-calendar-manage" class="modal-overlay fullscreen" role="dialog" aria-modal="true">
+    <div class="modal-sheet fullscreen">
+      <div class="modal-nav">
+        <button class="icon-btn" id="close-calendar-manage-btn" aria-label="Zurück">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="modal-title inline">Meine Kalender</h2>
+        <button class="icon-btn" id="add-calendar-btn" aria-label="Kalender hinzufügen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+      <ul class="calendar-list" id="calendar-list"></ul>
+    </div>
+  </div>
 
-  <!-- Firebase SDKs (v10 modular via CDN) -->
+  <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
   <script type="module" src="app.js"></script>
 </body>
 </html>

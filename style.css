@@ -933,6 +933,84 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 .stat-card-value.empty { color: var(--text-2); font-size: var(--text-base); font-weight: 500; }
 .stat-card.full-width { grid-column: span 2; }
 
+/* Punkt 4: Wasser/Koffein-Karten sind direkt tappbar */
+.stat-card.tappable {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.stat-card.tappable:active { background: var(--bg-3); }
+.stat-card-inline-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-sm);
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height var(--transition-base) ease, opacity var(--transition-base) ease, margin-top var(--transition-base) ease;
+}
+.stat-card-inline-controls.open {
+  max-height: 80px;
+  opacity: 1;
+}
+.stat-chip {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent-mid);
+  border-radius: var(--radius-full);
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+  white-space: nowrap;
+}
+.stat-chip:active { background: var(--accent-mid); transform: scale(0.94); }
+.stat-chip.reset {
+  background: var(--bg-4);
+  color: var(--text-1);
+  border-color: var(--border-mid);
+}
+
+/* Pace-Vorschau im Trainings-Modal */
+.workout-pace-preview {
+  font-size: var(--text-sm);
+  color: var(--accent);
+  font-weight: 600;
+  margin-top: -8px;
+  margin-bottom: var(--space-md);
+  min-height: 18px;
+}
+
+/* Verlaufs-Diagramm (Gewicht/Schlaf) */
+.chart-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+.chart-legend {
+  display: flex;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--text-1);
+  font-weight: 600;
+}
+.chart-legend-dot {
+  width: 8px; height: 8px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+#progress-chart svg { display: block; width: 100%; height: auto; }
+.chart-empty { padding: var(--space-lg) 0; text-align: center; color: var(--text-2); font-size: var(--text-sm); }
+
 .stats-hint {
   font-size: var(--text-xs);
   color: var(--text-2);

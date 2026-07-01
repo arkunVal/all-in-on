@@ -416,13 +416,6 @@ async function saveCheckin(dateStr, data) {
   } catch (e) { showToast("Fehler beim Speichern: " + e.message); }
 }
 
-/** Addiert einen Wert direkt im offenen Eingabefeld (Quick-Chips im Bearbeiten-Modal) */
-function bumpFieldValue(inputEl, amount) {
-  const current = Number(inputEl.value) || 0;
-  const next = Math.max(0, current + amount);
-  inputEl.value = next;
-}
-
 // ═══════════════════════════════════════════════════════
 // 8c. FIREBASE CRUD — TRAINING: VERLETZUNGEN / KRANKHEIT
 // ═══════════════════════════════════════════════════════
@@ -512,6 +505,7 @@ function initListeners() {
     state.checkins = snap.exists() ? snap.val() : {};
     renderTodayStats();
     renderWeightHistory();
+    renderProgressChart();
   });
 
   onValue(REFS.injuries(), snap => {
@@ -740,12 +734,15 @@ function renderDayEvents() {
     const calName = w.calendarId ? state.calendars[w.calendarId]?.name : null;
     const sport = SPORTS[w.sport] || { icon: "🏋️", label: w.sport };
     const durationStr = formatWorkoutDuration(w.durationHours, w.durationMinutes);
+    const distanceStr = (w.distance !== undefined && w.distance !== null) ? `${w.distance} ${distanceUnitFor(w.sport)}` : null;
+    const metric = computeWorkoutMetric(w.sport, w.distance, w.durationHours, w.durationMinutes);
+    const detailParts = [durationStr, distanceStr, metric, (w.load !== undefined && w.load !== null) ? `Belastung ${w.load}` : null].filter(Boolean);
     return `
     <li class="event-item" style="--event-color:${color}">
       <span class="event-time" title="${sport.label}">${sport.icon}</span>
       <div class="event-info">
         <div class="event-title-text">${escHtml(w.title || sport.label)}</div>
-        <div class="event-desc-text">${durationStr}${w.load !== undefined && w.load !== null ? ` · Belastung ${w.load}` : ""}</div>
+        <div class="event-desc-text">${detailParts.join(" · ")}</div>
         ${calName ? `<span class="event-cal-badge" style="margin-top:4px;display:inline-block">${escHtml(calName)}</span>` : ""}
       </div>
       <button class="delete-btn" data-id="${id}" data-kind="workout" aria-label="Löschen">
@@ -1107,38 +1104,62 @@ function renderTodayStats() {
            <div class="quality-bar-track"><div class="quality-bar-fill" style="width:${c.sleepQuality}%;background:${qualityColor(c.sleepQuality)}"></div></div>`
         : `<div class="stat-card-value empty">Noch nicht erfasst</div>`}
     </div>
-    <div class="stat-card">
+    <div class="stat-card tappable" id="water-stat-card">
       <div class="stat-card-label">💧 Flüssigkeit</div>
       <div class="stat-card-value">${water}<span class="unit">ml</span></div>
+      <div class="stat-card-inline-controls" id="water-inline-controls">
+        <button type="button" class="stat-chip" data-field="water" data-amount="250">+250ml</button>
+        <button type="button" class="stat-chip" data-field="water" data-amount="500">+500ml</button>
+        <button type="button" class="stat-chip" data-field="water" data-amount="-250">−250ml</button>
+        <button type="button" class="stat-chip reset" data-field="water" data-reset="1">Zurücksetzen</button>
+      </div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card tappable" id="caffeine-stat-card">
       <div class="stat-card-label">☕ Koffein</div>
       <div class="stat-card-value">${caffeine}<span class="unit">mg</span></div>
+      <div class="stat-card-inline-controls" id="caffeine-inline-controls">
+        <button type="button" class="stat-chip" data-field="caffeine" data-amount="80">+80mg</button>
+        <button type="button" class="stat-chip" data-field="caffeine" data-amount="40">+40mg</button>
+        <button type="button" class="stat-chip" data-field="caffeine" data-amount="-40">−40mg</button>
+        <button type="button" class="stat-chip reset" data-field="caffeine" data-reset="1">Zurücksetzen</button>
+      </div>
     </div>
   `;
+
+  wireInlineStatCards();
 }
 
-// Punkt 2: Quick-Chips nur zeigen, wenn das zugehörige Feld fokussiert ist
-const waterInput = document.getElementById("edit-water");
-const caffeineInput = document.getElementById("edit-caffeine");
-const waterChips = document.getElementById("water-quick-chips");
-const caffeineChips = document.getElementById("caffeine-quick-chips");
+// ── Punkt 4: Flüssigkeit & Koffein direkt über Tap auf die Karte anpassen ──
 
-waterInput.addEventListener("focus", () => waterChips.classList.add("visible"));
-caffeineInput.addEventListener("focus", () => caffeineChips.classList.add("visible"));
-// Beim Verlassen des Feldes wieder verstecken (kurze Verzögerung, damit Klick auf Chip noch ankommt)
-waterInput.addEventListener("blur", () => setTimeout(() => waterChips.classList.remove("visible"), 150));
-caffeineInput.addEventListener("blur", () => setTimeout(() => caffeineChips.classList.remove("visible"), 150));
+function wireInlineStatCards() {
+  const waterCard = document.getElementById("water-stat-card");
+  const caffeineCard = document.getElementById("caffeine-stat-card");
+  const waterControls = document.getElementById("water-inline-controls");
+  const caffeineControls = document.getElementById("caffeine-inline-controls");
 
-document.querySelectorAll(".quick-chip").forEach(chip => {
-  chip.addEventListener("click", () => {
-    const field = chip.dataset.field;
-    const amount = Number(chip.dataset.amount);
-    const targetInput = field === "water" ? waterInput : caffeineInput;
-    bumpFieldValue(targetInput, amount);
-    targetInput.focus();
+  waterCard.addEventListener("click", (e) => {
+    if (e.target.closest(".stat-chip")) return;
+    waterControls.classList.toggle("open");
   });
-});
+  caffeineCard.addEventListener("click", (e) => {
+    if (e.target.closest(".stat-chip")) return;
+    caffeineControls.classList.toggle("open");
+  });
+
+  document.querySelectorAll(".stat-chip").forEach(chip => {
+    chip.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const field = chip.dataset.field;
+      if (chip.dataset.reset) {
+        await saveCheckin(today(), { [field]: 0 });
+        return;
+      }
+      const amount = Number(chip.dataset.amount);
+      const current = state.checkins[today()]?.[field] || 0;
+      await saveCheckin(today(), { [field]: Math.max(0, current + amount) });
+    });
+  });
+}
 
 document.getElementById("edit-today-checkin-btn").addEventListener("click", () => {
   const t = today();
@@ -1150,8 +1171,6 @@ document.getElementById("edit-today-checkin-btn").addEventListener("click", () =
   const q = c.sleepQuality ?? 75;
   document.getElementById("edit-sleep-quality").value = q;
   document.getElementById("edit-sleep-quality-val").textContent = q;
-  document.getElementById("edit-water").value = c.water ?? "";
-  document.getElementById("edit-caffeine").value = c.caffeine ?? "";
   openModal("modal-edit-checkin");
 });
 
@@ -1167,18 +1186,105 @@ document.getElementById("save-edit-checkin-btn").addEventListener("click", async
   const sleepM = document.getElementById("edit-sleep-m").value;
   const hasSleepInput = sleepH !== "" || sleepM !== "";
   const sleepQuality = document.getElementById("edit-sleep-quality").value;
-  const water = document.getElementById("edit-water").value;
-  const caffeine = document.getElementById("edit-caffeine").value;
 
   await saveCheckin(today(), {
     weight:       weight === "" ? null : Number(weight),
     sleepHours:   hasSleepInput ? hmToDecimalHours(sleepH, sleepM) : null,
-    sleepQuality: sleepQuality === "" ? null : Number(sleepQuality),
-    water:        water === "" ? 0 : Number(water),
-    caffeine:     caffeine === "" ? 0 : Number(caffeine)
+    sleepQuality: sleepQuality === "" ? null : Number(sleepQuality)
   });
   closeModal("modal-edit-checkin");
 });
+
+// ═══════════════════════════════════════════════════════
+// 14d. VERLAUFS-DIAGRAMM: Gewicht (orange) + Schlafqualität (blau) — Punkt 3
+// ═══════════════════════════════════════════════════════
+
+const CHART_COLOR_WEIGHT = "#F7A94A";
+const CHART_COLOR_SLEEP  = "#4A9FF7";
+
+/** Baut ein SVG-Pfad-"d"-Attribut aus Punkten, wobei null-Werte den Pfad unterbrechen (kein Verbinden über Lücken) */
+function buildSvgPathD(points) {
+  let d = "";
+  let penDown = false;
+  points.forEach(p => {
+    if (p === null) { penDown = false; return; }
+    d += (penDown ? " L " : " M ") + p.x.toFixed(1) + " " + p.y.toFixed(1);
+    penDown = true;
+  });
+  return d;
+}
+
+function renderProgressChart() {
+  const container = document.getElementById("progress-chart");
+  if (!container) return;
+
+  // Alle Tage mit mindestens einem der beiden Werte, aufsteigend sortiert, letzte 30
+  const dates = Object.keys(state.checkins)
+    .filter(d => {
+      const c = state.checkins[d];
+      const hasWeight = c.weight !== undefined && c.weight !== null && c.weight !== "";
+      const hasQuality = c.sleepQuality !== undefined && c.sleepQuality !== null;
+      return hasWeight || hasQuality;
+    })
+    .sort()
+    .slice(-30);
+
+  if (dates.length < 2) {
+    container.innerHTML = `<div class="chart-empty">Noch nicht genug Daten für ein Diagramm — trag ein paar Tage lang Gewicht &amp; Schlafqualität ein.</div>`;
+    return;
+  }
+
+  const weights   = dates.map(d => { const v = state.checkins[d].weight; return (v === undefined || v === null || v === "") ? null : Number(v); });
+  const qualities = dates.map(d => { const v = state.checkins[d].sleepQuality; return (v === undefined || v === null) ? null : Number(v); });
+
+  const definedWeights = weights.filter(v => v !== null);
+  const wMin = definedWeights.length ? Math.min(...definedWeights) : 0;
+  const wMax = definedWeights.length ? Math.max(...definedWeights) : 1;
+  const wPad = Math.max((wMax - wMin) * 0.15, 0.5);
+  const wLow = wMin - wPad, wHigh = wMax + wPad;
+
+  // Schlafqualität ist bereits 0-100, feste Skala für konsistente Vergleichbarkeit
+  const qLow = 0, qHigh = 100;
+
+  const W = 600, H = 220, padL = 8, padR = 8, padT = 12, padB = 12;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const n = dates.length;
+  const xFor = (i) => padL + (n === 1 ? chartW / 2 : (i / (n - 1)) * chartW);
+  const yForWeight = (v) => padT + chartH - ((v - wLow) / (wHigh - wLow)) * chartH;
+  const yForQuality = (v) => padT + chartH - ((v - qLow) / (qHigh - qLow)) * chartH;
+
+  const weightPoints = weights.map((v, i) => v === null ? null : { x: xFor(i), y: yForWeight(v) });
+  const qualityPoints = qualities.map((v, i) => v === null ? null : { x: xFor(i), y: yForQuality(v) });
+
+  const weightPath = buildSvgPathD(weightPoints);
+  const qualityPath = buildSvgPathD(qualityPoints);
+
+  const weightDots = weightPoints.filter(Boolean).map(p =>
+    `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${CHART_COLOR_WEIGHT}" />`
+  ).join("");
+  const qualityDots = qualityPoints.filter(Boolean).map(p =>
+    `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${CHART_COLOR_SLEEP}" />`
+  ).join("");
+
+  // Grid-Linien (horizontal, dezent)
+  const gridLines = [0.25, 0.5, 0.75].map(frac =>
+    `<line x1="${padL}" y1="${(padT + chartH * frac).toFixed(1)}" x2="${W - padR}" y2="${(padT + chartH * frac).toFixed(1)}" stroke="var(--border)" stroke-width="1" />`
+  ).join("");
+
+  const firstLabel = formatDate(dates[0]);
+  const lastLabel  = formatDate(dates[dates.length - 1]);
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H + 20}" xmlns="http://www.w3.org/2000/svg">
+      ${gridLines}
+      <path d="${weightPath}" fill="none" stroke="${CHART_COLOR_WEIGHT}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="${qualityPath}" fill="none" stroke="${CHART_COLOR_SLEEP}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+      ${weightDots}
+      ${qualityDots}
+      <text x="${padL}" y="${H + 16}" font-size="11" fill="var(--text-2)">${escHtml(firstLabel)}</text>
+      <text x="${W - padR}" y="${H + 16}" font-size="11" fill="var(--text-2)" text-anchor="end">${escHtml(lastLabel)}</text>
+    </svg>`;
+}
 
 function renderWeightHistory() {
   const list = document.getElementById("weight-history-list");
@@ -1315,6 +1421,14 @@ function renderWorkoutList() {
     const detailHtml = isOpen ? `
       <div class="workout-detail">
         <div class="workout-detail-cell">
+          <div class="workout-detail-label">Distanz</div>
+          <div class="workout-detail-value">${w.distance !== undefined && w.distance !== null ? w.distance + " " + distanceUnitFor(w.sport) : "–"}</div>
+        </div>
+        <div class="workout-detail-cell">
+          <div class="workout-detail-label">${w.sport === "bike" ? "Ø Geschwindigkeit" : "Ø Pace"}</div>
+          <div class="workout-detail-value">${computeWorkoutMetric(w.sport, w.distance, w.durationHours, w.durationMinutes) || "–"}</div>
+        </div>
+        <div class="workout-detail-cell">
           <div class="workout-detail-label">Belastung</div>
           <div class="workout-detail-value">${w.load ?? "–"}</div>
         </div>
@@ -1417,11 +1531,59 @@ function renderZonePicker() {
 
 let selectedSport = "swim";
 
+/** Distanz-Einheit je Sportart: Rad/Lauf in km, Schwimmen in Metern */
+function distanceUnitFor(sport) {
+  return sport === "swim" ? "m" : "km";
+}
+
+/**
+ * Berechnet die sportartspezifische Kennzahl aus Distanz + Dauer:
+ * Radfahren → Ø km/h, Laufen → Pace min/km, Schwimmen → Pace min/100m
+ */
+function computeWorkoutMetric(sport, distance, durationHours, durationMinutes) {
+  const dist = Number(distance);
+  const totalMinutes = (Number(durationHours) || 0) * 60 + (Number(durationMinutes) || 0);
+  if (!dist || dist <= 0 || !totalMinutes || totalMinutes <= 0) return null;
+
+  if (sport === "bike") {
+    const speed = dist / (totalMinutes / 60);
+    return `${speed.toFixed(1)} km/h`;
+  }
+  if (sport === "run") {
+    const paceMinPerKm = totalMinutes / dist;
+    return `${formatPace(paceMinPerKm)} min/km`;
+  }
+  if (sport === "swim") {
+    const paceMin100m = totalMinutes / (dist / 100);
+    return `${formatPace(paceMin100m)} min/100m`;
+  }
+  return null;
+}
+
+/** Dezimalminuten → "M:SS" Format für Pace-Angaben */
+function formatPace(decimalMinutes) {
+  const totalSeconds = Math.round(decimalMinutes * 60);
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function updateWorkoutPacePreview() {
+  const distance = document.getElementById("workout-distance").value;
+  const h = document.getElementById("workout-duration-h").value;
+  const m = document.getElementById("workout-duration-m").value;
+  const preview = document.getElementById("workout-pace-preview");
+  const metric = computeWorkoutMetric(selectedSport, distance, h, m);
+  preview.textContent = metric ? `Ø ${metric}` : "";
+}
+
 function setSelectedSport(sport) {
   selectedSport = sport;
   document.querySelectorAll(".sport-btn").forEach(btn => {
     btn.classList.toggle("selected", btn.dataset.sport === sport);
   });
+  document.getElementById("workout-distance-unit-label").textContent = `(${distanceUnitFor(sport)})`;
+  updateWorkoutPacePreview();
 }
 
 document.getElementById("sport-picker").addEventListener("click", (e) => {
@@ -1429,6 +1591,10 @@ document.getElementById("sport-picker").addEventListener("click", (e) => {
   if (!btn) return;
   setSelectedSport(btn.dataset.sport);
 });
+
+document.getElementById("workout-distance").addEventListener("input", updateWorkoutPacePreview);
+document.getElementById("workout-duration-h").addEventListener("input", updateWorkoutPacePreview);
+document.getElementById("workout-duration-m").addEventListener("input", updateWorkoutPacePreview);
 
 document.getElementById("workout-focus-aerob").addEventListener("input", (e) => {
   document.getElementById("workout-focus-aerob-val").textContent = Number(e.target.value).toFixed(1);
@@ -1456,6 +1622,7 @@ function openWorkoutModal(workout, workoutId) {
   document.getElementById("workout-date").value = workout?.date || state.selectedDate || today();
   document.getElementById("workout-duration-h").value = workout?.durationHours ?? "";
   document.getElementById("workout-duration-m").value = workout?.durationMinutes ?? "";
+  document.getElementById("workout-distance").value = workout?.distance ?? "";
   document.getElementById("workout-load").value = workout?.load ?? "";
   document.getElementById("workout-hr").value = workout?.avgHr ?? "";
 
@@ -1468,6 +1635,7 @@ function openWorkoutModal(workout, workoutId) {
 
   state.selectedZones = new Set(Array.isArray(workout?.zones) ? workout.zones : []);
   renderZonePicker();
+  updateWorkoutPacePreview();
 
   openModal("modal-workout");
 }
@@ -1481,6 +1649,7 @@ document.getElementById("save-workout-btn").addEventListener("click", async () =
   const date = document.getElementById("workout-date").value;
   const durationHours = document.getElementById("workout-duration-h").value;
   const durationMinutes = document.getElementById("workout-duration-m").value;
+  const distance = document.getElementById("workout-distance").value;
   const load = document.getElementById("workout-load").value;
   const avgHr = document.getElementById("workout-hr").value;
   const focusAerobic = document.getElementById("workout-focus-aerob").value;
@@ -1496,6 +1665,7 @@ document.getElementById("save-workout-btn").addEventListener("click", async () =
     date,
     durationHours: durationHours === "" ? 0 : Number(durationHours),
     durationMinutes: durationMinutes === "" ? 0 : Number(durationMinutes),
+    distance: distance === "" ? null : Number(distance),
     load: load === "" ? null : Number(load),
     avgHr: avgHr === "" ? null : Number(avgHr),
     focusAerobic: Number(focusAerobic),

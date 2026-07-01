@@ -132,7 +132,7 @@
           <button class="text-btn" id="edit-today-checkin-btn">Bearbeiten</button>
         </div>
         <div class="today-stats-grid" id="today-stats-grid"></div>
-        <p class="stats-hint">Tippe auf „Bearbeiten", um Flüssigkeit und Koffein schnell zu erfassen.</p>
+        <p class="stats-hint">Tippe auf Flüssigkeit oder Koffein, um Werte schnell zu erfassen.</p>
 
         <!-- Trainings (Punkt 3) -->
         <div class="section-header">
@@ -152,9 +152,16 @@
           <li class="empty-state">Keine Einträge.</li>
         </ul>
 
-        <!-- Gewichtsverlauf -->
+        <!-- Gewicht & Schlaf Verlauf (Punkt 3: Diagramm) -->
         <div class="section-header">
-          <span class="section-title">Gewichtsverlauf</span>
+          <span class="section-title">Gewicht &amp; Schlaf</span>
+        </div>
+        <div class="chart-card">
+          <div class="chart-legend">
+            <span class="chart-legend-item"><span class="chart-legend-dot" style="background:#F7A94A"></span>Gewicht</span>
+            <span class="chart-legend-item"><span class="chart-legend-dot" style="background:#4A9FF7"></span>Schlafqualität</span>
+          </div>
+          <div id="progress-chart"></div>
         </div>
         <ul class="history-list" id="weight-history-list">
           <li class="empty-state">Noch keine Einträge.</li>
@@ -541,24 +548,6 @@
         <label class="form-label" for="edit-sleep-quality">Schlafqualität: <span id="edit-sleep-quality-val">75</span> / 100</label>
         <input class="range-input" id="edit-sleep-quality" type="range" min="0" max="100" value="75" />
       </div>
-      <div class="form-group">
-        <label class="form-label" for="edit-water">Flüssigkeit (ml)</label>
-        <input class="form-input" id="edit-water" type="number" inputmode="numeric" step="50" placeholder="z.B. 2000" />
-        <div class="quick-chip-row" id="water-quick-chips">
-          <button type="button" class="quick-chip" data-field="water" data-amount="250">+250ml</button>
-          <button type="button" class="quick-chip" data-field="water" data-amount="500">+500ml</button>
-          <button type="button" class="quick-chip" data-field="water" data-amount="-250">−250ml</button>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="edit-caffeine">Koffein (mg)</label>
-        <input class="form-input" id="edit-caffeine" type="number" inputmode="numeric" step="10" placeholder="z.B. 160" />
-        <div class="quick-chip-row" id="caffeine-quick-chips">
-          <button type="button" class="quick-chip" data-field="caffeine" data-amount="80">+80mg (Espresso)</button>
-          <button type="button" class="quick-chip" data-field="caffeine" data-amount="40">+40mg (Tee)</button>
-          <button type="button" class="quick-chip" data-field="caffeine" data-amount="-40">−40mg</button>
-        </div>
-      </div>
 
       <div class="modal-actions">
         <button class="btn btn-ghost" id="cancel-edit-checkin-btn">Abbrechen</button>
@@ -648,6 +637,12 @@
           </div>
         </div>
       </div>
+
+      <div class="form-group">
+        <label class="form-label" for="workout-distance">Distanz <span id="workout-distance-unit-label">(km)</span></label>
+        <input class="form-input" id="workout-distance" type="number" inputmode="decimal" min="0" step="0.01" placeholder="z.B. 21.1" />
+      </div>
+      <p class="workout-pace-preview" id="workout-pace-preview"></p>
 
       <div class="form-row">
         <div class="form-group flex-1">

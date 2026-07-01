@@ -45,7 +45,9 @@ const REFS = {
   checkins:  () => ref(db, "checkins"),
   checkin:   (dateStr) => ref(db, `checkins/${dateStr}`),
   injuries:  () => ref(db, "injuries"),
-  injury:    (id) => ref(db, `injuries/${id}`)
+  injury:    (id) => ref(db, `injuries/${id}`),
+  workouts:  () => ref(db, "workouts"),
+  workout:   (id) => ref(db, `workouts/${id}`)
 };
 
 // ═══════════════════════════════════════════════════════
@@ -71,8 +73,37 @@ const state = {
   // Training-Tracking
   checkins:             {},  // { "YYYY-MM-DD": { weight, sleepHours, sleepQuality, water, caffeine } }
   injuries:             {},
-  openInjuryIds:        new Set()
+  openInjuryIds:        new Set(),
+  workouts:             {},
+  openWorkoutIds:       new Set(),
+  selectedZones:        new Set(), // aktuell im Trainings-Modal ausgewählte Zonen
+  editingWorkoutId:      null
 };
+
+// ═══════════════════════════════════════════════════════
+// 2c. TRAINING: SPORTARTEN & ZONEN (Punkt 3)
+// ═══════════════════════════════════════════════════════
+
+const SPORTS = {
+  swim: { label: "Schwimmen", icon: "🏊" },
+  bike: { label: "Radfahren", icon: "🚴" },
+  run:  { label: "Laufen",    icon: "🏃" }
+};
+
+const TRAINING_ZONES = [
+  { id: "z1_erholung", label: "Z1 · Erholung" },
+  { id: "z2_ausdauer", label: "Z2 · Ausdauer" },
+  { id: "z2_fatmax",   label: "Z2 · FatMax" },
+  { id: "z3_tempo",    label: "Z3 · Tempo" },
+  { id: "z4_schwelle", label: "Z4 · Schwelle" },
+  { id: "z5_vo2max",   label: "Z5 · VO2Max" },
+  { id: "z5_neuro",    label: "Z5 · Neuro" },
+  { id: "z5_anaerob",  label: "Z5 · Anaerob" }
+];
+
+function zoneLabel(zoneId) {
+  return TRAINING_ZONES.find(z => z.id === zoneId)?.label || zoneId;
+}
 
 // ═══════════════════════════════════════════════════════
 // 2b. SPRÜCHE FÜR TAGE OHNE TERMINE (Punkt 2)
@@ -137,6 +168,16 @@ function formatSleepDuration(decimal) {
   if (decimal === undefined || decimal === null || decimal === "") return "";
   const { h, m } = decimalHoursToHM(decimal);
   if (m === 0) return `${h}h`;
+  return `${h}h ${m}min`;
+}
+
+/** Dauer aus Stunden+Minuten → Anzeige-String, z.B. (1, 15) → "1h 15min" */
+function formatWorkoutDuration(hours, minutes) {
+  const h = Number(hours) || 0;
+  const m = Number(minutes) || 0;
+  if (h === 0 && m === 0) return "–";
+  if (m === 0) return `${h}h`;
+  if (h === 0) return `${m}min`;
   return `${h}h ${m}min`;
 }
 let toastTimer = null;
@@ -399,6 +440,28 @@ async function deleteInjury(id) {
 }
 
 // ═══════════════════════════════════════════════════════
+// 8d. FIREBASE CRUD — TRAINING: WORKOUTS (Punkt 3)
+// ═══════════════════════════════════════════════════════
+
+async function createWorkout(data) {
+  try {
+    const newRef = push(REFS.workouts());
+    await set(newRef, { ...data, createdAt: Date.now() });
+    showToast("Training gespeichert ✓");
+  } catch (e) { showToast("Fehler beim Speichern: " + e.message); }
+}
+async function updateWorkout(id, data) {
+  try {
+    await update(REFS.workout(id), data);
+    showToast("Training aktualisiert ✓");
+  } catch (e) { showToast("Fehler beim Speichern: " + e.message); }
+}
+async function deleteWorkout(id) {
+  try { await remove(REFS.workout(id)); showToast("Training gelöscht"); }
+  catch (e) { showToast("Fehler beim Löschen: " + e.message); }
+}
+
+// ═══════════════════════════════════════════════════════
 // 9. FIREBASE REALTIME LISTENER
 // ═══════════════════════════════════════════════════════
 
@@ -437,10 +500,12 @@ function initListeners() {
     state.calendars = snap.exists() ? snap.val() : {};
     renderCalFilterBar();
     populateCalendarSelect();
+    populateWorkoutCalendarSelect();
     renderCalendarManageList();
     renderCalendar();
     renderWeekStrip();
     renderDayEvents();
+    renderWorkoutList();
   });
 
   onValue(REFS.checkins(), snap => {
@@ -452,6 +517,16 @@ function initListeners() {
   onValue(REFS.injuries(), snap => {
     state.injuries = snap.exists() ? snap.val() : {};
     renderInjuryList();
+  });
+
+  onValue(REFS.workouts(), snap => {
+    state.workouts = snap.exists() ? snap.val() : {};
+    renderWorkoutList();
+    populateWorkoutCalendarSelect();
+    // Workouts erscheinen auch im Kalender (Punkt 3) — dort neu rendern
+    renderCalendar();
+    renderWeekStrip();
+    renderDayEvents();
   });
 }
 
@@ -498,6 +573,24 @@ function renderHeaderActions() {
 // 11. KALENDER RENDERING (Punkt 4: Wochenstreifen + Aufklappbar)
 // ═══════════════════════════════════════════════════════
 
+/** Sammelt Events + Workouts gruppiert nach Datum, gefiltert nach aktivem Kalender-Filter */
+function collectCalendarItemsByDate() {
+  const byDate = {};
+  Object.entries(state.events).forEach(([id, e]) => {
+    if (!e.date) return;
+    if (state.calFilter !== "all" && e.calendarId !== state.calFilter) return;
+    if (!byDate[e.date]) byDate[e.date] = [];
+    byDate[e.date].push({ ...e, id, _type: "event" });
+  });
+  Object.entries(state.workouts).forEach(([id, w]) => {
+    if (!w.date) return;
+    if (state.calFilter !== "all" && w.calendarId !== state.calFilter) return;
+    if (!byDate[w.date]) byDate[w.date] = [];
+    byDate[w.date].push({ ...w, id, _type: "workout" });
+  });
+  return byDate;
+}
+
 function renderCalendar() {
   const grid  = document.getElementById("calendar-grid");
   const label = document.getElementById("cal-month-label");
@@ -511,14 +604,7 @@ function renderCalendar() {
   const daysInMonth = new Date(yr, mo+1, 0).getDate();
   const daysInPrev  = new Date(yr, mo, 0).getDate();
 
-  // Events gruppiert nach Datum, mit Kalenderfarben (gefiltert nach calFilter)
-  const eventsByDate = {};
-  Object.values(state.events).forEach(e => {
-    if (!e.date) return;
-    if (state.calFilter !== "all" && e.calendarId !== state.calFilter) return;
-    if (!eventsByDate[e.date]) eventsByDate[e.date] = [];
-    eventsByDate[e.date].push(e);
-  });
+  const itemsByDate = collectCalendarItemsByDate();
 
   let html = "", cellCount = 0;
 
@@ -531,11 +617,11 @@ function renderCalendar() {
     const dateStr = `${yr}-${String(mo+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
     const isToday = dateStr === today();
     const isSelected = dateStr === state.selectedDate;
-    const dayEvents = eventsByDate[dateStr] || [];
+    const dayItems = itemsByDate[dateStr] || [];
     const classes = ["cal-day", isToday?"today":"", isSelected?"selected":""].filter(Boolean).join(" ");
 
-    const dots = dayEvents.slice(0,3).map(e =>
-      `<span class="event-dot" style="background:${calColor(e.calendarId)}"></span>`
+    const dots = dayItems.slice(0,3).map(item =>
+      `<span class="event-dot ${item._type === 'workout' ? 'workout-dot' : ''}" style="background:${calColor(item.calendarId)}"></span>`
     ).join("");
 
     html += `<div class="${classes}" data-date="${dateStr}">
@@ -567,22 +653,16 @@ function renderWeekStrip() {
   const mon = new Date(sel);
   mon.setDate(sel.getDate() - dow);
 
-  const eventsByDate = {};
-  Object.values(state.events).forEach(e => {
-    if (!e.date) return;
-    if (state.calFilter !== "all" && e.calendarId !== state.calFilter) return;
-    if (!eventsByDate[e.date]) eventsByDate[e.date] = [];
-    eventsByDate[e.date].push(e);
-  });
+  const itemsByDate = collectCalendarItemsByDate();
 
   let html = "";
   for (let i = 0; i < 7; i++) {
     const d = new Date(mon); d.setDate(mon.getDate() + i);
     const ds = toDateString(d);
     const isT = ds === today(), isSel = ds === state.selectedDate;
-    const dayEvents = eventsByDate[ds] || [];
-    const dots = dayEvents.slice(0,3).map(e =>
-      `<span class="event-dot" style="background:${calColor(e.calendarId)}"></span>`
+    const dayItems = itemsByDate[ds] || [];
+    const dots = dayItems.slice(0,3).map(item =>
+      `<span class="event-dot ${item._type === 'workout' ? 'workout-dot' : ''}" style="background:${calColor(item.calendarId)}"></span>`
     ).join("");
 
     html += `<div class="week-day-item ${isT?"today":""} ${isSel?"selected":""}" data-date="${ds}">
@@ -627,12 +707,15 @@ function renderDayEvents() {
   if (state.calFilter !== "all") dayEvents = dayEvents.filter(([, e]) => e.calendarId === state.calFilter);
   dayEvents.sort(([, a], [, b]) => (a.time || "").localeCompare(b.time || ""));
 
-  if (!dayEvents.length) {
-    list.innerHTML = `<li class="empty-state">Keine Events für diesen Tag.</li>`;
+  let dayWorkouts = Object.entries(state.workouts).filter(([, w]) => w.date === sd);
+  if (state.calFilter !== "all") dayWorkouts = dayWorkouts.filter(([, w]) => w.calendarId === state.calFilter);
+
+  if (!dayEvents.length && !dayWorkouts.length) {
+    list.innerHTML = `<li class="empty-state">Keine Einträge für diesen Tag.</li>`;
     return;
   }
 
-  list.innerHTML = dayEvents.map(([id, e]) => {
+  const eventsHtml = dayEvents.map(([id, e]) => {
     const color = calColor(e.calendarId);
     const calName = e.calendarId ? state.calendars[e.calendarId]?.name : null;
     return `
@@ -643,7 +726,7 @@ function renderDayEvents() {
         ${e.description ? `<div class="event-desc-text">${escHtml(e.description)}</div>` : ""}
         ${calName ? `<span class="event-cal-badge" style="margin-top:4px;display:inline-block">${escHtml(calName)}${(e.reminderMinutes !== undefined && e.reminderMinutes !== null) ? " · 🔔" : ""}</span>` : ""}
       </div>
-      <button class="delete-btn" data-id="${id}" aria-label="Löschen">
+      <button class="delete-btn" data-id="${id}" data-kind="event" aria-label="Löschen">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
           <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
@@ -652,7 +735,31 @@ function renderDayEvents() {
     </li>`;
   }).join("");
 
-  list.querySelectorAll(".delete-btn").forEach(btn => {
+  const workoutsHtml = dayWorkouts.map(([id, w]) => {
+    const color = calColor(w.calendarId);
+    const calName = w.calendarId ? state.calendars[w.calendarId]?.name : null;
+    const sport = SPORTS[w.sport] || { icon: "🏋️", label: w.sport };
+    const durationStr = formatWorkoutDuration(w.durationHours, w.durationMinutes);
+    return `
+    <li class="event-item" style="--event-color:${color}">
+      <span class="event-time" title="${sport.label}">${sport.icon}</span>
+      <div class="event-info">
+        <div class="event-title-text">${escHtml(w.title || sport.label)}</div>
+        <div class="event-desc-text">${durationStr}${w.load !== undefined && w.load !== null ? ` · Belastung ${w.load}` : ""}</div>
+        ${calName ? `<span class="event-cal-badge" style="margin-top:4px;display:inline-block">${escHtml(calName)}</span>` : ""}
+      </div>
+      <button class="delete-btn" data-id="${id}" data-kind="workout" aria-label="Löschen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </button>
+    </li>`;
+  }).join("");
+
+  list.innerHTML = eventsHtml + workoutsHtml;
+
+  list.querySelectorAll('.delete-btn[data-kind="event"]').forEach(btn => {
     btn.addEventListener("click", () => {
       const ev = state.events[btn.dataset.id];
       confirmDelete({
@@ -661,6 +768,20 @@ function renderDayEvents() {
         onConfirm: () => {
           const li = btn.closest("li");
           animateRemoval(li, () => deleteEvent(btn.dataset.id));
+        }
+      });
+    });
+  });
+
+  list.querySelectorAll('.delete-btn[data-kind="workout"]').forEach(btn => {
+    btn.addEventListener("click", () => {
+      const w = state.workouts[btn.dataset.id];
+      confirmDelete({
+        title: "Training löschen?",
+        text: w?.title ? `"${w.title}" wird endgültig gelöscht.` : "Dieses Training wird endgültig gelöscht.",
+        onConfirm: () => {
+          const li = btn.closest("li");
+          animateRemoval(li, () => deleteWorkout(btn.dataset.id));
         }
       });
     });
@@ -889,7 +1010,61 @@ function attachNoteHandlers(container) {
       });
     });
   });
+  // Punkt 2: Notiz öffnen (analog zu To-Dos) — Klick auf Karte außerhalb des Lösch-Buttons
+  container.querySelectorAll(".note-card").forEach(card => {
+    card.addEventListener("click", (e) => {
+      if (e.target.closest(".delete-btn")) return;
+      openNoteDetail(card.dataset.id);
+    });
+  });
 }
+
+// ── Notiz-Detail-Modal: öffnen, speichern, löschen ──
+
+let activeNoteDetailId = null;
+
+function openNoteDetail(id) {
+  const n = state.notes[id];
+  if (!n) return;
+  activeNoteDetailId = id;
+  document.getElementById("note-detail-title").value = n.title || "";
+  document.getElementById("note-detail-content").value = n.content || "";
+  populateProjectSelects(); // stellt sicher, dass note-detail-project befüllt ist
+  document.getElementById("note-detail-project").value = n.projectId || "";
+  const meta = document.getElementById("note-detail-meta");
+  meta.textContent = n.createdAt ? `Erstellt am ${new Date(n.createdAt).toLocaleDateString("de-DE")}` : "";
+  openModal("modal-note-detail");
+}
+
+document.getElementById("close-note-detail-btn").addEventListener("click", () => {
+  closeModal("modal-note-detail");
+  activeNoteDetailId = null;
+});
+
+document.getElementById("save-note-detail-btn").addEventListener("click", async () => {
+  if (!activeNoteDetailId) return;
+  const title = document.getElementById("note-detail-title").value.trim();
+  const content = document.getElementById("note-detail-content").value.trim();
+  const projectId = document.getElementById("note-detail-project").value || null;
+  if (!title && !content) { showToast("Bitte Inhalt eingeben"); shakeModal("modal-note-detail"); return; }
+  await update(REFS.note(activeNoteDetailId), { title, content, projectId });
+  closeModal("modal-note-detail");
+  activeNoteDetailId = null;
+});
+
+document.getElementById("delete-note-detail-btn").addEventListener("click", () => {
+  if (!activeNoteDetailId) return;
+  const n = state.notes[activeNoteDetailId];
+  confirmDelete({
+    title: "Notiz löschen?",
+    text: n?.title ? `"${n.title}" wird endgültig gelöscht.` : "Diese Notiz wird endgültig gelöscht.",
+    onConfirm: async () => {
+      await deleteNote(activeNoteDetailId);
+      closeModal("modal-note-detail");
+      activeNoteDetailId = null;
+    }
+  });
+});
 
 // ═══════════════════════════════════════════════════════
 // 14b. TRAINING RENDERING — Heutige Werte, Verletzungen, Verlauf
@@ -1119,6 +1294,226 @@ document.getElementById("save-injury-btn").addEventListener("click", async () =>
 });
 
 // ═══════════════════════════════════════════════════════
+// 14c. TRAININGS RENDERING & MODAL-LOGIK (Punkt 3)
+// ═══════════════════════════════════════════════════════
+
+function renderWorkoutList() {
+  const list = document.getElementById("workout-list");
+  const items = toArray(state.workouts).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt||0)-(a.createdAt||0));
+
+  if (!items.length) {
+    list.innerHTML = `<li class="empty-state">Noch keine Trainings erfasst.</li>`;
+    return;
+  }
+
+  list.innerHTML = items.map(w => {
+    const sport = SPORTS[w.sport] || { icon: "🏋️", label: w.sport || "Training" };
+    const isOpen = state.openWorkoutIds.has(w.id);
+    const calName = w.calendarId ? state.calendars[w.calendarId]?.name : null;
+    const zones = Array.isArray(w.zones) ? w.zones : [];
+
+    const detailHtml = isOpen ? `
+      <div class="workout-detail">
+        <div class="workout-detail-cell">
+          <div class="workout-detail-label">Belastung</div>
+          <div class="workout-detail-value">${w.load ?? "–"}</div>
+        </div>
+        <div class="workout-detail-cell">
+          <div class="workout-detail-label">Ø Herzfrequenz</div>
+          <div class="workout-detail-value">${w.avgHr ? w.avgHr + " bpm" : "–"}</div>
+        </div>
+        <div class="workout-detail-cell">
+          <div class="workout-detail-label">Fokus Aerob</div>
+          <div class="workout-detail-value">${(w.focusAerobic ?? 0).toFixed(1)}</div>
+        </div>
+        <div class="workout-detail-cell">
+          <div class="workout-detail-label">Fokus Anaerob</div>
+          <div class="workout-detail-value">${(w.focusAnaerobic ?? 0).toFixed(1)}</div>
+        </div>
+        ${zones.length ? `
+        <div class="workout-zones-row">
+          ${zones.map(z => `<span class="workout-zone-tag">${zoneLabel(z)}</span>`).join("")}
+        </div>` : ""}
+        <div class="workout-zones-row workout-actions">
+          <button type="button" class="workout-action-btn" data-edit-workout="${w.id}">Bearbeiten</button>
+          <button type="button" class="workout-action-btn danger" data-delete-workout="${w.id}">Löschen</button>
+        </div>
+      </div>` : "";
+
+    return `
+      <li class="workout-item" data-id="${w.id}">
+        <div class="workout-row" data-toggle-workout="${w.id}">
+          <div class="workout-sport-icon">${sport.icon}</div>
+          <div class="workout-info">
+            <div class="workout-title-text">${escHtml(w.title || sport.label)}</div>
+            <div class="workout-meta">
+              <span class="workout-date">${formatDate(w.date)}</span>
+              <span class="workout-badge">${formatWorkoutDuration(w.durationHours, w.durationMinutes)}</span>
+              ${calName ? `<span class="workout-badge">${escHtml(calName)}</span>` : ""}
+            </div>
+          </div>
+        </div>
+        ${detailHtml}
+      </li>`;
+  }).join("");
+
+  list.querySelectorAll("[data-toggle-workout]").forEach(row => {
+    row.addEventListener("click", () => {
+      const id = row.dataset.toggleWorkout;
+      if (state.openWorkoutIds.has(id)) state.openWorkoutIds.delete(id);
+      else state.openWorkoutIds.add(id);
+      renderWorkoutList();
+    });
+  });
+  list.querySelectorAll("[data-edit-workout]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openWorkoutModal(state.workouts[btn.dataset.editWorkout], btn.dataset.editWorkout);
+    });
+  });
+  list.querySelectorAll("[data-delete-workout]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const w = state.workouts[btn.dataset.deleteWorkout];
+      confirmDelete({
+        title: "Training löschen?",
+        text: w?.title ? `"${w.title}" wird endgültig gelöscht.` : "Dieses Training wird endgültig gelöscht.",
+        onConfirm: () => {
+          const li = btn.closest("li");
+          animateRemoval(li, () => deleteWorkout(btn.dataset.deleteWorkout));
+        }
+      });
+    });
+  });
+}
+
+function populateWorkoutCalendarSelect() {
+  const sel = document.getElementById("workout-calendar");
+  if (!sel) return;
+  const current = sel.value;
+  const cals = toArray(state.calendars).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  if (!cals.length) {
+    sel.innerHTML = `<option value="">— Noch kein Kalender —</option>`;
+    return;
+  }
+  sel.innerHTML = cals.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join("");
+  sel.value = current || cals[0].id;
+}
+
+function renderZonePicker() {
+  const picker = document.getElementById("zone-picker");
+  picker.innerHTML = TRAINING_ZONES.map(z =>
+    `<button type="button" class="zone-chip ${state.selectedZones.has(z.id) ? "selected" : ""}" data-zone="${z.id}">${z.label}</button>`
+  ).join("");
+  picker.querySelectorAll(".zone-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const zoneId = chip.dataset.zone;
+      if (state.selectedZones.has(zoneId)) state.selectedZones.delete(zoneId);
+      else state.selectedZones.add(zoneId);
+      renderZonePicker();
+    });
+  });
+}
+
+let selectedSport = "swim";
+
+function setSelectedSport(sport) {
+  selectedSport = sport;
+  document.querySelectorAll(".sport-btn").forEach(btn => {
+    btn.classList.toggle("selected", btn.dataset.sport === sport);
+  });
+}
+
+document.getElementById("sport-picker").addEventListener("click", (e) => {
+  const btn = e.target.closest(".sport-btn");
+  if (!btn) return;
+  setSelectedSport(btn.dataset.sport);
+});
+
+document.getElementById("workout-focus-aerob").addEventListener("input", (e) => {
+  document.getElementById("workout-focus-aerob-val").textContent = Number(e.target.value).toFixed(1);
+});
+document.getElementById("workout-focus-anaerob").addEventListener("input", (e) => {
+  document.getElementById("workout-focus-anaerob-val").textContent = Number(e.target.value).toFixed(1);
+});
+
+/** Öffnet das Trainings-Modal. Ohne workout → neuer Eintrag, mit workout → Bearbeiten-Modus. */
+function openWorkoutModal(workout, workoutId) {
+  populateWorkoutCalendarSelect();
+
+  if (!Object.keys(state.calendars).length) {
+    showToast("Bitte zuerst einen Kalender anlegen");
+    openModal("modal-calendar");
+    return;
+  }
+
+  state.editingWorkoutId = workoutId || null;
+  document.getElementById("workout-modal-title").textContent = workout ? "Training bearbeiten" : "Training erfassen";
+
+  setSelectedSport(workout?.sport || "swim");
+  document.getElementById("workout-title").value = workout?.title || "";
+  document.getElementById("workout-calendar").value = workout?.calendarId || document.getElementById("workout-calendar").value;
+  document.getElementById("workout-date").value = workout?.date || state.selectedDate || today();
+  document.getElementById("workout-duration-h").value = workout?.durationHours ?? "";
+  document.getElementById("workout-duration-m").value = workout?.durationMinutes ?? "";
+  document.getElementById("workout-load").value = workout?.load ?? "";
+  document.getElementById("workout-hr").value = workout?.avgHr ?? "";
+
+  const aerob = workout?.focusAerobic ?? 0;
+  const anaerob = workout?.focusAnaerobic ?? 0;
+  document.getElementById("workout-focus-aerob").value = aerob;
+  document.getElementById("workout-focus-aerob-val").textContent = Number(aerob).toFixed(1);
+  document.getElementById("workout-focus-anaerob").value = anaerob;
+  document.getElementById("workout-focus-anaerob-val").textContent = Number(anaerob).toFixed(1);
+
+  state.selectedZones = new Set(Array.isArray(workout?.zones) ? workout.zones : []);
+  renderZonePicker();
+
+  openModal("modal-workout");
+}
+
+document.getElementById("add-workout-btn").addEventListener("click", () => openWorkoutModal(null, null));
+document.getElementById("cancel-workout-btn").addEventListener("click", () => closeModal("modal-workout"));
+
+document.getElementById("save-workout-btn").addEventListener("click", async () => {
+  const title = document.getElementById("workout-title").value.trim();
+  const calendarId = document.getElementById("workout-calendar").value;
+  const date = document.getElementById("workout-date").value;
+  const durationHours = document.getElementById("workout-duration-h").value;
+  const durationMinutes = document.getElementById("workout-duration-m").value;
+  const load = document.getElementById("workout-load").value;
+  const avgHr = document.getElementById("workout-hr").value;
+  const focusAerobic = document.getElementById("workout-focus-aerob").value;
+  const focusAnaerobic = document.getElementById("workout-focus-anaerob").value;
+
+  if (!calendarId) { showToast("Bitte Kalender wählen"); shakeModal("modal-workout"); return; }
+  if (!date) { showToast("Bitte Datum wählen"); shakeModal("modal-workout"); return; }
+
+  const payload = {
+    sport: selectedSport,
+    title,
+    calendarId,
+    date,
+    durationHours: durationHours === "" ? 0 : Number(durationHours),
+    durationMinutes: durationMinutes === "" ? 0 : Number(durationMinutes),
+    load: load === "" ? null : Number(load),
+    avgHr: avgHr === "" ? null : Number(avgHr),
+    focusAerobic: Number(focusAerobic),
+    focusAnaerobic: Number(focusAnaerobic),
+    zones: Array.from(state.selectedZones)
+  };
+
+  if (state.editingWorkoutId) {
+    await updateWorkout(state.editingWorkoutId, payload);
+  } else {
+    await createWorkout(payload);
+  }
+
+  closeModal("modal-workout");
+  state.editingWorkoutId = null;
+});
+
+// ═══════════════════════════════════════════════════════
 // 15. PROJEKT RENDERING
 // ═══════════════════════════════════════════════════════
 
@@ -1181,7 +1576,7 @@ function renderProjectDetail() {
 // ═══════════════════════════════════════════════════════
 
 function populateProjectSelects() {
-  ["todo-project", "note-project"].forEach(id => {
+  ["todo-project", "note-project", "note-detail-project"].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
     const current = sel.value;
@@ -1224,6 +1619,11 @@ document.getElementById("confirm-delete-btn").addEventListener("click", () => {
 // ═══════════════════════════════════════════════════════
 
 document.getElementById("header-action-btn").addEventListener("click", () => {
+  if (state.currentView === "training") {
+    openWorkoutModal(null, null);
+    return;
+  }
+
   const modalMap = { calendar:"modal-event", projects:"modal-project", todos:"modal-todo", notes:"modal-note" };
   const m = modalMap[state.currentView];
   if (!m) return;

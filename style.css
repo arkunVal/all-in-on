@@ -70,24 +70,24 @@
 }
 
 html {
-  height: -webkit-fill-available;
+  height: 100%;
   overflow: hidden;
-  /* Punkt 1: Zoom via touch-action */
   touch-action: pan-x pan-y;
+  background: var(--bg-1);
 }
 
 body {
   font-family: var(--font-sans);
   font-size: var(--text-base);
-  background: var(--bg-0);
+  background: var(--bg-1);
   color: var(--text-0);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
-  min-height: -webkit-fill-available;
+  height: 100%;
   overflow: hidden;
-  /* Punkt 1: kein Pinch-Zoom */
   touch-action: pan-x pan-y;
+  position: fixed;
+  inset: 0;
 }
 
 ::-webkit-scrollbar { display: none; }
@@ -97,8 +97,8 @@ body {
 #app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  height: -webkit-fill-available;
+  position: fixed;
+  inset: 0;
   background: var(--bg-1);
   overflow: hidden;
 }
@@ -564,6 +564,10 @@ body {
   display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-sm);
 }
 .note-date { font-size: var(--text-xs); color: var(--text-2); }
+.note-detail-meta {
+  font-size: var(--text-xs); color: var(--text-2);
+  margin-bottom: var(--space-md);
+}
 
 /* ── KALENDER-LISTE (Verwaltung, Punkt 5) ── */
 .calendar-list {
@@ -1075,9 +1079,142 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 .history-weight { font-size: var(--text-base); font-weight: 700; }
 .history-sleep { font-size: var(--text-xs); color: var(--text-2); }
 
+/* ═══════════════════════════════════════════
+   TRAININGS / WORKOUTS (Punkt 3)
+   ═══════════════════════════════════════════ */
+
+/* Sportart-Auswahl */
+.sport-picker {
+  display: flex;
+  gap: var(--space-sm);
+}
+.sport-btn {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md) var(--space-sm);
+  font-size: 22px;
+  cursor: pointer;
+  color: var(--text-1);
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+.sport-btn span { font-size: var(--text-xs); font-weight: 600; color: var(--text-1); }
+.sport-btn.selected {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+.sport-btn.selected span { color: var(--accent); }
+.sport-btn:active { transform: scale(0.96); }
+
+/* Zonen-Auswahl (Mehrfachauswahl-Chips) */
+.zone-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+.zone-chip {
+  padding: 7px 12px;
+  border-radius: var(--radius-full);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+.zone-chip.selected {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.zone-chip:active { transform: scale(0.95); }
+
+/* Trainings-Liste */
+.workout-list {
+  list-style: none;
+  display: flex; flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xl);
+}
+.workout-item {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+.workout-row {
+  display: flex; align-items: center; gap: var(--space-md);
+}
+.workout-sport-icon {
+  width: 40px; height: 40px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--accent-dim);
+  font-size: 18px;
+}
+.workout-info { flex: 1; min-width: 0; }
+.workout-title-text { font-size: var(--text-base); font-weight: 600; }
+.workout-meta {
+  display: flex; align-items: center; gap: var(--space-sm); margin-top: 3px; flex-wrap: wrap;
+}
+.workout-date { font-size: var(--text-xs); color: var(--text-2); }
+.workout-badge {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+  padding: 1px 7px; border-radius: var(--radius-full);
+  color: var(--accent); background: var(--accent-dim);
+}
+.workout-detail {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-sm);
+}
+.workout-detail-cell { font-size: var(--text-xs); }
+.workout-detail-label { color: var(--text-2); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 700; font-size: 10px; margin-bottom: 2px; }
+.workout-detail-value { color: var(--text-0); font-size: var(--text-sm); font-weight: 600; }
+.workout-zones-row {
+  grid-column: span 2;
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-top: 2px;
+}
+.workout-zone-tag {
+  font-size: 10px; font-weight: 600;
+  padding: 2px 8px; border-radius: var(--radius-full);
+  background: var(--bg-3); color: var(--text-1);
+}
+.workout-actions {
+  display: flex; gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+.workout-action-btn {
+  flex: 1;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-1);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 8px;
+  cursor: pointer;
+}
+.workout-action-btn:active { background: var(--bg-4); }
+.workout-action-btn.danger { color: var(--danger); }
+
+/* Kalender-Punkte für Workouts unterscheiden sich optisch leicht (Ring statt voller Punkt) */
+.event-dot.workout-dot {
+  border: 1.5px solid var(--bg-2);
+}
+
 /* ── RESPONSIVE ── */
 @media (min-width: 768px) {
-  #app { max-width: 430px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+  #app { max-width: 430px; left: 50%; transform: translateX(-50%); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

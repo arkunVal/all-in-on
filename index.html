@@ -134,6 +134,15 @@
         <div class="today-stats-grid" id="today-stats-grid"></div>
         <p class="stats-hint">Tippe auf „Bearbeiten", um Flüssigkeit und Koffein schnell zu erfassen.</p>
 
+        <!-- Trainings (Punkt 3) -->
+        <div class="section-header">
+          <span class="section-title">Trainings</span>
+          <button class="text-btn" id="add-workout-btn">+ Training</button>
+        </div>
+        <ul class="workout-list" id="workout-list">
+          <li class="empty-state">Noch keine Trainings erfasst.</li>
+        </ul>
+
         <!-- Verletzungen / Krankheit -->
         <div class="section-header">
           <span class="section-title">Verletzungen &amp; Krankheit</span>
@@ -405,6 +414,39 @@
     </div>
   </div>
 
+  <!-- Modal: Notiz-Detail (Punkt 2: Notizen öffnen & bearbeiten) -->
+  <div id="modal-note-detail" class="modal-overlay fullscreen" role="dialog" aria-modal="true">
+    <div class="modal-sheet fullscreen">
+      <div class="modal-nav">
+        <button class="icon-btn" id="close-note-detail-btn" aria-label="Zurück">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="modal-title inline">Notiz</h2>
+        <button class="icon-btn danger" id="delete-note-detail-btn" aria-label="Notiz löschen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="note-detail-title">Titel</label>
+        <input class="form-input" id="note-detail-title" type="text" placeholder="Notiz-Titel" autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="note-detail-content">Inhalt</label>
+        <textarea class="form-input form-textarea large" id="note-detail-content" placeholder="Deine Gedanken..." style="min-height: 260px"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="note-detail-project">Projekt (optional)</label>
+        <select class="form-input form-select" id="note-detail-project">
+          <option value="">— Kein Projekt —</option>
+        </select>
+      </div>
+      <div class="note-detail-meta" id="note-detail-meta"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="save-note-detail-btn" style="width:100%">Speichern</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Kalender-Verwaltung (Punkt 5) -->
   <div id="modal-calendar-manage" class="modal-overlay fullscreen" role="dialog" aria-modal="true">
     <div class="modal-sheet fullscreen">
@@ -558,6 +600,85 @@
       <div class="modal-actions">
         <button class="btn btn-ghost" id="cancel-injury-btn">Abbrechen</button>
         <button class="btn btn-primary" id="save-injury-btn">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Training erstellen/bearbeiten (Punkt 3) -->
+  <div id="modal-workout" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title" id="workout-modal-title">Training erfassen</h2>
+
+      <!-- Sportart -->
+      <div class="form-group">
+        <label class="form-label">Sportart</label>
+        <div class="sport-picker" id="sport-picker">
+          <button type="button" class="sport-btn" data-sport="swim">🏊<span>Schwimmen</span></button>
+          <button type="button" class="sport-btn" data-sport="bike">🚴<span>Radfahren</span></button>
+          <button type="button" class="sport-btn" data-sport="run">🏃<span>Laufen</span></button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="workout-title">Titel</label>
+        <input class="form-input" id="workout-title" type="text" placeholder="z.B. Intervalle, Longrun…" autocomplete="off" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="workout-calendar">Kalender</label>
+        <select class="form-input form-select" id="workout-calendar">
+          <option value="">— Kalender wählen —</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="workout-date">Datum</label>
+        <input class="form-input" id="workout-date" type="date" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Dauer</label>
+        <div class="form-row" style="margin-bottom:0">
+          <div class="form-group flex-1">
+            <input class="form-input" id="workout-duration-h" type="number" inputmode="numeric" min="0" step="1" placeholder="Std" />
+          </div>
+          <div class="form-group flex-1">
+            <input class="form-input" id="workout-duration-m" type="number" inputmode="numeric" min="0" max="59" step="5" placeholder="Min" />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label class="form-label" for="workout-load">Belastungswert</label>
+          <input class="form-input" id="workout-load" type="number" inputmode="numeric" min="0" step="1" placeholder="z.B. 85" />
+        </div>
+        <div class="form-group flex-1">
+          <label class="form-label" for="workout-hr">Ø Herzfrequenz</label>
+          <input class="form-input" id="workout-hr" type="number" inputmode="numeric" min="0" step="1" placeholder="bpm" />
+        </div>
+      </div>
+
+      <!-- Belastungs-Fokus -->
+      <div class="form-group">
+        <label class="form-label" for="workout-focus-aerob">Belastungs-Fokus Aerob: <span id="workout-focus-aerob-val">0.0</span></label>
+        <input class="range-input" id="workout-focus-aerob" type="range" min="0" max="5" step="0.1" value="0" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="workout-focus-anaerob">Belastungs-Fokus Anaerob: <span id="workout-focus-anaerob-val">0.0</span></label>
+        <input class="range-input" id="workout-focus-anaerob" type="range" min="0" max="5" step="0.1" value="0" />
+      </div>
+
+      <!-- Zonen (Mehrfachauswahl) -->
+      <div class="form-group">
+        <label class="form-label">Zone (Mehrfachauswahl möglich)</label>
+        <div class="zone-picker" id="zone-picker"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancel-workout-btn">Abbrechen</button>
+        <button class="btn btn-primary" id="save-workout-btn">Speichern</button>
       </div>
     </div>
   </div>

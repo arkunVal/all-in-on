@@ -1285,9 +1285,94 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 .workout-action-btn:active { background: var(--bg-4); }
 .workout-action-btn.danger { color: var(--danger); }
 
+.show-all-btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin-bottom: var(--space-xl);
+  color: var(--text-1);
+}
+
 /* Kalender-Punkte für Workouts unterscheiden sich optisch leicht (Ring statt voller Punkt) */
 .event-dot.workout-dot {
   border: 1.5px solid var(--bg-2);
+}
+
+/* ═══════════════════════════════════════════
+   FLÜSSIGKEIT/KOFFEIN-TRACKER (Punkt 1, Garmin-Stil)
+   ═══════════════════════════════════════════ */
+
+.intake-sheet {
+  display: flex;
+  flex-direction: column;
+}
+
+.intake-ring-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg) 0 var(--space-md);
+}
+
+#intake-ring-container svg { display: block; }
+
+.intake-ring-icon {
+  font-size: 40px;
+  line-height: 1;
+}
+.intake-ring-value {
+  font-size: 30px;
+  font-weight: 800;
+  fill: var(--text-0);
+}
+.intake-ring-unit {
+  font-size: 13px;
+  font-weight: 600;
+  fill: var(--text-2);
+}
+.intake-ring-goal {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--text-2);
+}
+
+.intake-manual-row {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+.intake-manual-row .form-input { flex: 1; }
+.intake-manual-btn { flex: none; padding: 12px var(--space-lg); }
+
+.intake-shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+.intake-shortcut-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md) var(--space-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+.intake-shortcut-btn:active { background: var(--bg-3); transform: scale(0.95); }
+.intake-shortcut-icon { font-size: 22px; }
+.intake-shortcut-label { font-size: var(--text-xs); font-weight: 700; color: var(--text-0); }
+.intake-shortcut-sub { font-size: 10px; color: var(--text-2); }
+.intake-shortcut-btn.negative .intake-shortcut-label { color: var(--text-1); }
+
+.intake-reset-btn {
+  align-self: center;
+  color: var(--text-2);
+  margin-top: auto;
+  margin-bottom: var(--space-md);
 }
 
 /* ── RESPONSIVE ── */

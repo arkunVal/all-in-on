@@ -172,13 +172,16 @@ function formatSleepDuration(decimal) {
 }
 
 /** Dauer aus Stunden+Minuten → Anzeige-String, z.B. (1, 15) → "1h 15min" */
-function formatWorkoutDuration(hours, minutes) {
+function formatWorkoutDuration(hours, minutes, seconds) {
   const h = Number(hours) || 0;
   const m = Number(minutes) || 0;
-  if (h === 0 && m === 0) return "–";
-  if (m === 0) return `${h}h`;
-  if (h === 0) return `${m}min`;
-  return `${h}h ${m}min`;
+  const s = Number(seconds) || 0;
+  if (h === 0 && m === 0 && s === 0) return "–";
+  const parts = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0 || h > 0) parts.push(`${m}min`);
+  if (s > 0) parts.push(`${s}s`);
+  return parts.join(" ");
 }
 let toastTimer = null;
 function showToast(msg) {
@@ -506,6 +509,9 @@ function initListeners() {
     renderTodayStats();
     renderWeightHistory();
     renderProgressChart();
+    if (document.getElementById("modal-intake").classList.contains("open")) {
+      renderIntakeRing(activeIntakeType);
+    }
   });
 
   onValue(REFS.injuries(), snap => {
@@ -733,9 +739,9 @@ function renderDayEvents() {
     const color = calColor(w.calendarId);
     const calName = w.calendarId ? state.calendars[w.calendarId]?.name : null;
     const sport = SPORTS[w.sport] || { icon: "🏋️", label: w.sport };
-    const durationStr = formatWorkoutDuration(w.durationHours, w.durationMinutes);
+    const durationStr = formatWorkoutDuration(w.durationHours, w.durationMinutes, w.durationSeconds);
     const distanceStr = (w.distance !== undefined && w.distance !== null) ? `${w.distance} ${distanceUnitFor(w.sport)}` : null;
-    const metric = computeWorkoutMetric(w.sport, w.distance, w.durationHours, w.durationMinutes);
+    const metric = computeWorkoutMetric(w.sport, w.distance, w.durationHours, w.durationMinutes, w.durationSeconds);
     const detailParts = [durationStr, distanceStr, metric, (w.load !== undefined && w.load !== null) ? `Belastung ${w.load}` : null].filter(Boolean);
     return `
     <li class="event-item" style="--event-color:${color}">
@@ -1107,59 +1113,138 @@ function renderTodayStats() {
     <div class="stat-card tappable" id="water-stat-card">
       <div class="stat-card-label">💧 Flüssigkeit</div>
       <div class="stat-card-value">${water}<span class="unit">ml</span></div>
-      <div class="stat-card-inline-controls" id="water-inline-controls">
-        <button type="button" class="stat-chip" data-field="water" data-amount="250">+250ml</button>
-        <button type="button" class="stat-chip" data-field="water" data-amount="500">+500ml</button>
-        <button type="button" class="stat-chip" data-field="water" data-amount="-250">−250ml</button>
-        <button type="button" class="stat-chip reset" data-field="water" data-reset="1">Zurücksetzen</button>
-      </div>
     </div>
     <div class="stat-card tappable" id="caffeine-stat-card">
       <div class="stat-card-label">☕ Koffein</div>
       <div class="stat-card-value">${caffeine}<span class="unit">mg</span></div>
-      <div class="stat-card-inline-controls" id="caffeine-inline-controls">
-        <button type="button" class="stat-chip" data-field="caffeine" data-amount="80">+80mg</button>
-        <button type="button" class="stat-chip" data-field="caffeine" data-amount="40">+40mg</button>
-        <button type="button" class="stat-chip" data-field="caffeine" data-amount="-40">−40mg</button>
-        <button type="button" class="stat-chip reset" data-field="caffeine" data-reset="1">Zurücksetzen</button>
-      </div>
     </div>
   `;
 
-  wireInlineStatCards();
+  document.getElementById("water-stat-card").addEventListener("click", () => openIntakeDetail("water"));
+  document.getElementById("caffeine-stat-card").addEventListener("click", () => openIntakeDetail("caffeine"));
 }
 
-// ── Punkt 4: Flüssigkeit & Koffein direkt über Tap auf die Karte anpassen ──
+// ═══════════════════════════════════════════════════════
+// 14a2. FLÜSSIGKEIT/KOFFEIN-TRACKER — Vollbild, Garmin-Connect-Stil (Punkt 1)
+// ═══════════════════════════════════════════════════════
 
-function wireInlineStatCards() {
-  const waterCard = document.getElementById("water-stat-card");
-  const caffeineCard = document.getElementById("caffeine-stat-card");
-  const waterControls = document.getElementById("water-inline-controls");
-  const caffeineControls = document.getElementById("caffeine-inline-controls");
+const INTAKE_CONFIG = {
+  water: {
+    label: "Flüssigkeit",
+    icon: "💧",
+    unit: "ml",
+    goal: 2500,
+    color: "#4A9FF7",
+    shortcuts: [
+      { label: "Glas", sub: "250ml", icon: "🥛", amount: 250 },
+      { label: "Flasche", sub: "500ml", icon: "🧴", amount: 500 },
+      { label: "Große Flasche", sub: "750ml", icon: "🚰", amount: 750 },
+      { label: "Tasse", sub: "200ml", icon: "☕", amount: 200 },
+      { label: "Liter", sub: "1000ml", icon: "💧", amount: 1000 },
+      { label: "Entfernen", sub: "−250ml", icon: "➖", amount: -250, negative: true }
+    ]
+  },
+  caffeine: {
+    label: "Koffein",
+    icon: "☕",
+    unit: "mg",
+    goal: 400,
+    color: "#B8793D",
+    shortcuts: [
+      { label: "Espresso", sub: "80mg", icon: "☕", amount: 80 },
+      { label: "Filterkaffee", sub: "120mg", icon: "🫖", amount: 120 },
+      { label: "Cola", sub: "40mg", icon: "🥤", amount: 40 },
+      { label: "Energy-Drink", sub: "80mg", icon: "⚡", amount: 80 },
+      { label: "Grüner Tee", sub: "30mg", icon: "🍵", amount: 30 },
+      { label: "Entfernen", sub: "−40mg", icon: "➖", amount: -40, negative: true }
+    ]
+  }
+};
 
-  waterCard.addEventListener("click", (e) => {
-    if (e.target.closest(".stat-chip")) return;
-    waterControls.classList.toggle("open");
-  });
-  caffeineCard.addEventListener("click", (e) => {
-    if (e.target.closest(".stat-chip")) return;
-    caffeineControls.classList.toggle("open");
-  });
+let activeIntakeType = "water";
 
-  document.querySelectorAll(".stat-chip").forEach(chip => {
-    chip.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      const field = chip.dataset.field;
-      if (chip.dataset.reset) {
-        await saveCheckin(today(), { [field]: 0 });
-        return;
-      }
-      const amount = Number(chip.dataset.amount);
-      const current = state.checkins[today()]?.[field] || 0;
-      await saveCheckin(today(), { [field]: Math.max(0, current + amount) });
+function currentIntakeValue(type) {
+  return state.checkins[today()]?.[type] || 0;
+}
+
+function renderIntakeRing(type) {
+  const cfg = INTAKE_CONFIG[type];
+  const value = currentIntakeValue(type);
+  const percent = Math.min(value / cfg.goal, 1);
+
+  const size = 220, strokeWidth = 16, r = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference * (1 - percent);
+  const cx = size / 2, cy = size / 2;
+
+  const container = document.getElementById("intake-ring-container");
+  container.innerHTML = `
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--bg-3)" stroke-width="${strokeWidth}" />
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${cfg.color}" stroke-width="${strokeWidth}"
+        stroke-linecap="round" stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"
+        transform="rotate(-90 ${cx} ${cy})" style="transition: stroke-dashoffset 400ms ease" />
+      <text x="${cx}" y="${cy - 34}" text-anchor="middle" class="intake-ring-icon" style="font-size:36px">${cfg.icon}</text>
+      <text x="${cx}" y="${cy + 14}" text-anchor="middle" class="intake-ring-value">${value}</text>
+      <text x="${cx}" y="${cy + 34}" text-anchor="middle" class="intake-ring-unit">${cfg.unit}</text>
+      <text x="${cx}" y="${cy + 58}" text-anchor="middle" class="intake-ring-goal">Ziel: ${cfg.goal} ${cfg.unit}</text>
+    </svg>`;
+}
+
+function renderIntakeShortcuts(type) {
+  const cfg = INTAKE_CONFIG[type];
+  const grid = document.getElementById("intake-shortcut-grid");
+  grid.innerHTML = cfg.shortcuts.map(s => `
+    <button type="button" class="intake-shortcut-btn ${s.negative ? "negative" : ""}" data-amount="${s.amount}">
+      <span class="intake-shortcut-icon">${s.icon}</span>
+      <span class="intake-shortcut-label">${escHtml(s.label)}</span>
+      <span class="intake-shortcut-sub">${escHtml(s.sub)}</span>
+    </button>
+  `).join("");
+
+  grid.querySelectorAll(".intake-shortcut-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const amount = Number(btn.dataset.amount);
+      const current = currentIntakeValue(activeIntakeType);
+      await saveCheckin(today(), { [activeIntakeType]: Math.max(0, current + amount) });
+      renderIntakeRing(activeIntakeType);
     });
   });
 }
+
+function openIntakeDetail(type) {
+  activeIntakeType = type;
+  const cfg = INTAKE_CONFIG[type];
+  document.getElementById("intake-title").textContent = cfg.label;
+  document.getElementById("intake-manual-input").value = "";
+  renderIntakeRing(type);
+  renderIntakeShortcuts(type);
+  openModal("modal-intake");
+}
+
+document.getElementById("close-intake-btn").addEventListener("click", () => closeModal("modal-intake"));
+
+document.getElementById("intake-manual-add-btn").addEventListener("click", async () => {
+  const input = document.getElementById("intake-manual-input");
+  const amount = Number(input.value);
+  if (!amount || amount === 0) { showToast("Bitte eine Menge eingeben"); shakeModal("modal-intake"); return; }
+  const current = currentIntakeValue(activeIntakeType);
+  await saveCheckin(today(), { [activeIntakeType]: Math.max(0, current + amount) });
+  input.value = "";
+  renderIntakeRing(activeIntakeType);
+});
+
+document.getElementById("intake-reset-btn").addEventListener("click", () => {
+  const cfg = INTAKE_CONFIG[activeIntakeType];
+  confirmDelete({
+    title: `${cfg.label} zurücksetzen?`,
+    text: `Der heutige Wert für ${cfg.label} wird auf 0 gesetzt.`,
+    onConfirm: async () => {
+      await saveCheckin(today(), { [activeIntakeType]: 0 });
+      renderIntakeRing(activeIntakeType);
+    }
+  });
+});
 
 document.getElementById("edit-today-checkin-btn").addEventListener("click", () => {
   const t = today();
@@ -1403,89 +1488,90 @@ document.getElementById("save-injury-btn").addEventListener("click", async () =>
 // 14c. TRAININGS RENDERING & MODAL-LOGIK (Punkt 3)
 // ═══════════════════════════════════════════════════════
 
-function renderWorkoutList() {
-  const list = document.getElementById("workout-list");
-  const items = toArray(state.workouts).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt||0)-(a.createdAt||0));
+/** Datum N Tage vor heute als "YYYY-MM-DD" */
+function daysAgoDateString(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return toDateString(d);
+}
 
-  if (!items.length) {
-    list.innerHTML = `<li class="empty-state">Noch keine Trainings erfasst.</li>`;
-    return;
-  }
+/** Baut das HTML für einen einzelnen Trainings-Listeneintrag (für kompakte & volle Liste wiederverwendet) */
+function buildWorkoutItemHtml(w) {
+  const sport = SPORTS[w.sport] || { icon: "🏋️", label: w.sport || "Training" };
+  const isOpen = state.openWorkoutIds.has(w.id);
+  const calName = w.calendarId ? state.calendars[w.calendarId]?.name : null;
+  const zones = Array.isArray(w.zones) ? w.zones : [];
 
-  list.innerHTML = items.map(w => {
-    const sport = SPORTS[w.sport] || { icon: "🏋️", label: w.sport || "Training" };
-    const isOpen = state.openWorkoutIds.has(w.id);
-    const calName = w.calendarId ? state.calendars[w.calendarId]?.name : null;
-    const zones = Array.isArray(w.zones) ? w.zones : [];
+  const detailHtml = isOpen ? `
+    <div class="workout-detail">
+      <div class="workout-detail-cell">
+        <div class="workout-detail-label">Distanz</div>
+        <div class="workout-detail-value">${w.distance !== undefined && w.distance !== null ? w.distance + " " + distanceUnitFor(w.sport) : "–"}</div>
+      </div>
+      <div class="workout-detail-cell">
+        <div class="workout-detail-label">${w.sport === "bike" ? "Ø Geschwindigkeit" : "Ø Pace"}</div>
+        <div class="workout-detail-value">${computeWorkoutMetric(w.sport, w.distance, w.durationHours, w.durationMinutes, w.durationSeconds) || "–"}</div>
+      </div>
+      <div class="workout-detail-cell">
+        <div class="workout-detail-label">Belastung</div>
+        <div class="workout-detail-value">${w.load ?? "–"}</div>
+      </div>
+      <div class="workout-detail-cell">
+        <div class="workout-detail-label">Ø Herzfrequenz</div>
+        <div class="workout-detail-value">${w.avgHr ? w.avgHr + " bpm" : "–"}</div>
+      </div>
+      <div class="workout-detail-cell">
+        <div class="workout-detail-label">Fokus Aerob</div>
+        <div class="workout-detail-value">${(w.focusAerobic ?? 0).toFixed(1)}</div>
+      </div>
+      <div class="workout-detail-cell">
+        <div class="workout-detail-label">Fokus Anaerob</div>
+        <div class="workout-detail-value">${(w.focusAnaerobic ?? 0).toFixed(1)}</div>
+      </div>
+      ${zones.length ? `
+      <div class="workout-zones-row">
+        ${zones.map(z => `<span class="workout-zone-tag">${zoneLabel(z)}</span>`).join("")}
+      </div>` : ""}
+      <div class="workout-zones-row workout-actions">
+        <button type="button" class="workout-action-btn" data-edit-workout="${w.id}">Bearbeiten</button>
+        <button type="button" class="workout-action-btn danger" data-delete-workout="${w.id}">Löschen</button>
+      </div>
+    </div>` : "";
 
-    const detailHtml = isOpen ? `
-      <div class="workout-detail">
-        <div class="workout-detail-cell">
-          <div class="workout-detail-label">Distanz</div>
-          <div class="workout-detail-value">${w.distance !== undefined && w.distance !== null ? w.distance + " " + distanceUnitFor(w.sport) : "–"}</div>
-        </div>
-        <div class="workout-detail-cell">
-          <div class="workout-detail-label">${w.sport === "bike" ? "Ø Geschwindigkeit" : "Ø Pace"}</div>
-          <div class="workout-detail-value">${computeWorkoutMetric(w.sport, w.distance, w.durationHours, w.durationMinutes) || "–"}</div>
-        </div>
-        <div class="workout-detail-cell">
-          <div class="workout-detail-label">Belastung</div>
-          <div class="workout-detail-value">${w.load ?? "–"}</div>
-        </div>
-        <div class="workout-detail-cell">
-          <div class="workout-detail-label">Ø Herzfrequenz</div>
-          <div class="workout-detail-value">${w.avgHr ? w.avgHr + " bpm" : "–"}</div>
-        </div>
-        <div class="workout-detail-cell">
-          <div class="workout-detail-label">Fokus Aerob</div>
-          <div class="workout-detail-value">${(w.focusAerobic ?? 0).toFixed(1)}</div>
-        </div>
-        <div class="workout-detail-cell">
-          <div class="workout-detail-label">Fokus Anaerob</div>
-          <div class="workout-detail-value">${(w.focusAnaerobic ?? 0).toFixed(1)}</div>
-        </div>
-        ${zones.length ? `
-        <div class="workout-zones-row">
-          ${zones.map(z => `<span class="workout-zone-tag">${zoneLabel(z)}</span>`).join("")}
-        </div>` : ""}
-        <div class="workout-zones-row workout-actions">
-          <button type="button" class="workout-action-btn" data-edit-workout="${w.id}">Bearbeiten</button>
-          <button type="button" class="workout-action-btn danger" data-delete-workout="${w.id}">Löschen</button>
-        </div>
-      </div>` : "";
-
-    return `
-      <li class="workout-item" data-id="${w.id}">
-        <div class="workout-row" data-toggle-workout="${w.id}">
-          <div class="workout-sport-icon">${sport.icon}</div>
-          <div class="workout-info">
-            <div class="workout-title-text">${escHtml(w.title || sport.label)}</div>
-            <div class="workout-meta">
-              <span class="workout-date">${formatDate(w.date)}</span>
-              <span class="workout-badge">${formatWorkoutDuration(w.durationHours, w.durationMinutes)}</span>
-              ${calName ? `<span class="workout-badge">${escHtml(calName)}</span>` : ""}
-            </div>
+  return `
+    <li class="workout-item" data-id="${w.id}">
+      <div class="workout-row" data-toggle-workout="${w.id}">
+        <div class="workout-sport-icon">${sport.icon}</div>
+        <div class="workout-info">
+          <div class="workout-title-text">${escHtml(w.title || sport.label)}</div>
+          <div class="workout-meta">
+            <span class="workout-date">${formatDate(w.date)}</span>
+            <span class="workout-badge">${formatWorkoutDuration(w.durationHours, w.durationMinutes, w.durationSeconds)}</span>
+            ${calName ? `<span class="workout-badge">${escHtml(calName)}</span>` : ""}
           </div>
         </div>
-        ${detailHtml}
-      </li>`;
-  }).join("");
+      </div>
+      ${detailHtml}
+    </li>`;
+}
 
-  list.querySelectorAll("[data-toggle-workout]").forEach(row => {
+/** Verkabelt Aufklappen/Bearbeiten/Löschen für eine gerenderte Trainings-Liste */
+function wireWorkoutListHandlers(container, rerenderFn) {
+  container.querySelectorAll("[data-toggle-workout]").forEach(row => {
     row.addEventListener("click", () => {
       const id = row.dataset.toggleWorkout;
       if (state.openWorkoutIds.has(id)) state.openWorkoutIds.delete(id);
       else state.openWorkoutIds.add(id);
-      renderWorkoutList();
+      rerenderFn();
     });
   });
-  list.querySelectorAll("[data-edit-workout]").forEach(btn => {
+  container.querySelectorAll("[data-edit-workout]").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       openWorkoutModal(state.workouts[btn.dataset.editWorkout], btn.dataset.editWorkout);
     });
   });
-  list.querySelectorAll("[data-delete-workout]").forEach(btn => {
+  container.querySelectorAll("[data-delete-workout]").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const w = state.workouts[btn.dataset.deleteWorkout];
@@ -1500,6 +1586,61 @@ function renderWorkoutList() {
     });
   });
 }
+
+/** Punkt 3: Kompakte Liste zeigt nur Trainings der letzten 3 Tage, Rest über "Alle anzeigen" */
+function renderWorkoutList() {
+  const list = document.getElementById("workout-list");
+  const allItems = toArray(state.workouts).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt||0)-(a.createdAt||0));
+
+  const cutoff = daysAgoDateString(2); // heute + 2 Tage zurück = letzte 3 Tage
+  const recentItems = allItems.filter(w => (w.date || "") >= cutoff);
+
+  if (!allItems.length) {
+    list.innerHTML = `<li class="empty-state">Noch keine Trainings erfasst.</li>`;
+    updateShowAllWorkoutsButton(0);
+    return;
+  }
+
+  if (!recentItems.length) {
+    list.innerHTML = `<li class="empty-state">Keine Trainings in den letzten 3 Tagen.</li>`;
+  } else {
+    list.innerHTML = recentItems.map(buildWorkoutItemHtml).join("");
+    wireWorkoutListHandlers(list, renderWorkoutList);
+  }
+
+  updateShowAllWorkoutsButton(allItems.length);
+}
+
+/** Zeigt/versteckt den "Alle Trainings anzeigen"-Button je nach Gesamtanzahl */
+function updateShowAllWorkoutsButton(totalCount) {
+  const btn = document.getElementById("show-all-workouts-btn");
+  if (!btn) return;
+  if (totalCount > 0) {
+    btn.style.display = "block";
+    btn.textContent = `Alle Trainings anzeigen (${totalCount})`;
+  } else {
+    btn.style.display = "none";
+  }
+}
+
+/** Vollständige Trainings-Liste im Vollbild-Modal */
+function renderAllWorkoutsList() {
+  const list = document.getElementById("all-workout-list");
+  const items = toArray(state.workouts).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.createdAt||0)-(a.createdAt||0));
+
+  if (!items.length) {
+    list.innerHTML = `<li class="empty-state">Noch keine Trainings erfasst.</li>`;
+    return;
+  }
+  list.innerHTML = items.map(buildWorkoutItemHtml).join("");
+  wireWorkoutListHandlers(list, renderAllWorkoutsList);
+}
+
+document.getElementById("show-all-workouts-btn").addEventListener("click", () => {
+  renderAllWorkoutsList();
+  openModal("modal-all-workouts");
+});
+document.getElementById("close-all-workouts-btn").addEventListener("click", () => closeModal("modal-all-workouts"));
 
 function populateWorkoutCalendarSelect() {
   const sel = document.getElementById("workout-calendar");
@@ -1540,9 +1681,9 @@ function distanceUnitFor(sport) {
  * Berechnet die sportartspezifische Kennzahl aus Distanz + Dauer:
  * Radfahren → Ø km/h, Laufen → Pace min/km, Schwimmen → Pace min/100m
  */
-function computeWorkoutMetric(sport, distance, durationHours, durationMinutes) {
+function computeWorkoutMetric(sport, distance, durationHours, durationMinutes, durationSeconds) {
   const dist = Number(distance);
-  const totalMinutes = (Number(durationHours) || 0) * 60 + (Number(durationMinutes) || 0);
+  const totalMinutes = (Number(durationHours) || 0) * 60 + (Number(durationMinutes) || 0) + (Number(durationSeconds) || 0) / 60;
   if (!dist || dist <= 0 || !totalMinutes || totalMinutes <= 0) return null;
 
   if (sport === "bike") {
@@ -1572,8 +1713,9 @@ function updateWorkoutPacePreview() {
   const distance = document.getElementById("workout-distance").value;
   const h = document.getElementById("workout-duration-h").value;
   const m = document.getElementById("workout-duration-m").value;
+  const s = document.getElementById("workout-duration-s").value;
   const preview = document.getElementById("workout-pace-preview");
-  const metric = computeWorkoutMetric(selectedSport, distance, h, m);
+  const metric = computeWorkoutMetric(selectedSport, distance, h, m, s);
   preview.textContent = metric ? `Ø ${metric}` : "";
 }
 
@@ -1595,6 +1737,7 @@ document.getElementById("sport-picker").addEventListener("click", (e) => {
 document.getElementById("workout-distance").addEventListener("input", updateWorkoutPacePreview);
 document.getElementById("workout-duration-h").addEventListener("input", updateWorkoutPacePreview);
 document.getElementById("workout-duration-m").addEventListener("input", updateWorkoutPacePreview);
+document.getElementById("workout-duration-s").addEventListener("input", updateWorkoutPacePreview);
 
 document.getElementById("workout-focus-aerob").addEventListener("input", (e) => {
   document.getElementById("workout-focus-aerob-val").textContent = Number(e.target.value).toFixed(1);
@@ -1622,6 +1765,7 @@ function openWorkoutModal(workout, workoutId) {
   document.getElementById("workout-date").value = workout?.date || state.selectedDate || today();
   document.getElementById("workout-duration-h").value = workout?.durationHours ?? "";
   document.getElementById("workout-duration-m").value = workout?.durationMinutes ?? "";
+  document.getElementById("workout-duration-s").value = workout?.durationSeconds ?? "";
   document.getElementById("workout-distance").value = workout?.distance ?? "";
   document.getElementById("workout-load").value = workout?.load ?? "";
   document.getElementById("workout-hr").value = workout?.avgHr ?? "";
@@ -1649,6 +1793,7 @@ document.getElementById("save-workout-btn").addEventListener("click", async () =
   const date = document.getElementById("workout-date").value;
   const durationHours = document.getElementById("workout-duration-h").value;
   const durationMinutes = document.getElementById("workout-duration-m").value;
+  const durationSeconds = document.getElementById("workout-duration-s").value;
   const distance = document.getElementById("workout-distance").value;
   const load = document.getElementById("workout-load").value;
   const avgHr = document.getElementById("workout-hr").value;
@@ -1665,6 +1810,7 @@ document.getElementById("save-workout-btn").addEventListener("click", async () =
     date,
     durationHours: durationHours === "" ? 0 : Number(durationHours),
     durationMinutes: durationMinutes === "" ? 0 : Number(durationMinutes),
+    durationSeconds: durationSeconds === "" ? 0 : Number(durationSeconds),
     distance: distance === "" ? null : Number(distance),
     load: load === "" ? null : Number(load),
     avgHr: avgHr === "" ? null : Number(avgHr),

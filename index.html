@@ -142,6 +142,7 @@
         <ul class="workout-list" id="workout-list">
           <li class="empty-state">Noch keine Trainings erfasst.</li>
         </ul>
+        <button class="text-btn show-all-btn" id="show-all-workouts-btn" style="display:none">Alle Trainings anzeigen</button>
 
         <!-- Verletzungen / Krankheit -->
         <div class="section-header">
@@ -454,6 +455,49 @@
     </div>
   </div>
 
+  <!-- Modal: Flüssigkeit/Koffein-Tracker (Punkt 1, Garmin-Connect-Stil) -->
+  <div id="modal-intake" class="modal-overlay fullscreen" role="dialog" aria-modal="true">
+    <div class="modal-sheet fullscreen intake-sheet">
+      <div class="modal-nav">
+        <button class="icon-btn" id="close-intake-btn" aria-label="Zurück">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="modal-title inline" id="intake-title">Flüssigkeit</h2>
+        <div style="width:36px"></div>
+      </div>
+
+      <div class="intake-ring-wrapper">
+        <div id="intake-ring-container"></div>
+      </div>
+
+      <div class="intake-manual-row">
+        <input class="form-input" id="intake-manual-input" type="number" inputmode="numeric" min="0" placeholder="Menge eingeben…" />
+        <button class="btn btn-primary intake-manual-btn" id="intake-manual-add-btn">Hinzufügen</button>
+      </div>
+
+      <div class="section-header">
+        <span class="section-title">Schnellauswahl</span>
+      </div>
+      <div class="intake-shortcut-grid" id="intake-shortcut-grid"></div>
+
+      <button class="text-btn intake-reset-btn" id="intake-reset-btn">Heute zurücksetzen</button>
+    </div>
+  </div>
+
+  <!-- Modal: Alle Trainings (Punkt 3) -->
+  <div id="modal-all-workouts" class="modal-overlay fullscreen" role="dialog" aria-modal="true">
+    <div class="modal-sheet fullscreen">
+      <div class="modal-nav">
+        <button class="icon-btn" id="close-all-workouts-btn" aria-label="Zurück">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="modal-title inline">Alle Trainings</h2>
+        <div style="width:36px"></div>
+      </div>
+      <ul class="workout-list" id="all-workout-list"></ul>
+    </div>
+  </div>
+
   <!-- Modal: Kalender-Verwaltung (Punkt 5) -->
   <div id="modal-calendar-manage" class="modal-overlay fullscreen" role="dialog" aria-modal="true">
     <div class="modal-sheet fullscreen">
@@ -633,7 +677,10 @@
             <input class="form-input" id="workout-duration-h" type="number" inputmode="numeric" min="0" step="1" placeholder="Std" />
           </div>
           <div class="form-group flex-1">
-            <input class="form-input" id="workout-duration-m" type="number" inputmode="numeric" min="0" max="59" step="5" placeholder="Min" />
+            <input class="form-input" id="workout-duration-m" type="number" inputmode="numeric" min="0" max="59" step="1" placeholder="Min" />
+          </div>
+          <div class="form-group flex-1">
+            <input class="form-input" id="workout-duration-s" type="number" inputmode="numeric" min="0" max="59" step="1" placeholder="Sek" />
           </div>
         </div>
       </div>

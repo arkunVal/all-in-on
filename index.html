@@ -647,9 +647,20 @@
       <div class="form-group">
         <label class="form-label">Sportart</label>
         <div class="sport-picker" id="sport-picker">
-          <button type="button" class="sport-btn" data-sport="swim">🏊<span>Schwimmen</span></button>
-          <button type="button" class="sport-btn" data-sport="bike">🚴<span>Radfahren</span></button>
-          <button type="button" class="sport-btn" data-sport="run">🏃<span>Laufen</span></button>
+          <button type="button" class="sport-btn" data-sport="swim">🏊<span>Swim</span></button>
+          <button type="button" class="sport-btn" data-sport="bike">🚴<span>Bike</span></button>
+          <button type="button" class="sport-btn" data-sport="run">🏃<span>Run</span></button>
+          <button type="button" class="sport-btn" data-sport="other">💪<span>Sonstiges</span></button>
+        </div>
+      </div>
+
+      <!-- Punkt 1: Unterart für "Sonstiges" -->
+      <div class="form-group" id="other-type-group" style="display:none">
+        <label class="form-label">Art</label>
+        <div class="sport-picker" id="other-type-picker">
+          <button type="button" class="sport-btn" data-other-type="hit">🔥<span>HIT</span></button>
+          <button type="button" class="sport-btn" data-other-type="athletics">🏋️<span>Athletik</span></button>
+          <button type="button" class="sport-btn" data-other-type="mobility">🧘<span>Mobility</span></button>
         </div>
       </div>
 
@@ -685,11 +696,13 @@
         </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label" for="workout-distance">Distanz <span id="workout-distance-unit-label">(km)</span></label>
-        <input class="form-input" id="workout-distance" type="number" inputmode="decimal" min="0" step="0.01" placeholder="z.B. 21.1" />
+      <div id="workout-distance-group">
+        <div class="form-group">
+          <label class="form-label" for="workout-distance">Distanz <span id="workout-distance-unit-label">(km)</span></label>
+          <input class="form-input" id="workout-distance" type="number" inputmode="decimal" min="0" step="0.01" placeholder="z.B. 21.1" />
+        </div>
+        <p class="workout-pace-preview" id="workout-pace-preview"></p>
       </div>
-      <p class="workout-pace-preview" id="workout-pace-preview"></p>
 
       <div class="form-row">
         <div class="form-group flex-1">

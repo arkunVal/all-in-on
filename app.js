@@ -85,10 +85,31 @@ const state = {
 // ═══════════════════════════════════════════════════════
 
 const SPORTS = {
-  swim: { label: "Schwimmen", icon: "🏊" },
-  bike: { label: "Radfahren", icon: "🚴" },
-  run:  { label: "Laufen",    icon: "🏃" }
+  swim:  { label: "Swim", icon: "🏊" },
+  bike:  { label: "Bike", icon: "🚴" },
+  run:   { label: "Run",  icon: "🏃" },
+  other: { label: "Sonstiges", icon: "💪" }
 };
+
+/** Punkt 1: Unterarten für die Sportart "Sonstiges" */
+const OTHER_TYPES = [
+  { id: "hit",       label: "HIT",       icon: "🔥" },
+  { id: "athletics", label: "Athletik",  icon: "🏋️" },
+  { id: "mobility",  label: "Mobility",  icon: "🧘" }
+];
+
+function otherTypeInfo(id) {
+  return OTHER_TYPES.find(t => t.id === id) || OTHER_TYPES[0];
+}
+
+/** Liefert Icon+Label für die Anzeige eines Workouts, berücksichtigt die Unterart bei "Sonstiges" */
+function workoutDisplayInfo(w) {
+  if (w.sport === "other") {
+    const t = otherTypeInfo(w.otherType);
+    return { icon: t.icon, label: t.label };
+  }
+  return SPORTS[w.sport] || { icon: "🏋️", label: w.sport || "Training" };
+}
 
 const TRAINING_ZONES = [
   { id: "z1_erholung", label: "Z1 · Erholung" },
@@ -738,7 +759,7 @@ function renderDayEvents() {
   const workoutsHtml = dayWorkouts.map(([id, w]) => {
     const color = calColor(w.calendarId);
     const calName = w.calendarId ? state.calendars[w.calendarId]?.name : null;
-    const sport = SPORTS[w.sport] || { icon: "🏋️", label: w.sport };
+    const sport = workoutDisplayInfo(w);
     const durationStr = formatWorkoutDuration(w.durationHours, w.durationMinutes, w.durationSeconds);
     const distanceStr = (w.distance !== undefined && w.distance !== null) ? `${w.distance} ${distanceUnitFor(w.sport)}` : null;
     const metric = computeWorkoutMetric(w.sport, w.distance, w.durationHours, w.durationMinutes, w.durationSeconds);
@@ -1497,13 +1518,15 @@ function daysAgoDateString(n) {
 
 /** Baut das HTML für einen einzelnen Trainings-Listeneintrag (für kompakte & volle Liste wiederverwendet) */
 function buildWorkoutItemHtml(w) {
-  const sport = SPORTS[w.sport] || { icon: "🏋️", label: w.sport || "Training" };
+  const sport = workoutDisplayInfo(w);
   const isOpen = state.openWorkoutIds.has(w.id);
   const calName = w.calendarId ? state.calendars[w.calendarId]?.name : null;
   const zones = Array.isArray(w.zones) ? w.zones : [];
+  const isDistanceBased = w.sport !== "other";
 
   const detailHtml = isOpen ? `
     <div class="workout-detail">
+      ${isDistanceBased ? `
       <div class="workout-detail-cell">
         <div class="workout-detail-label">Distanz</div>
         <div class="workout-detail-value">${w.distance !== undefined && w.distance !== null ? w.distance + " " + distanceUnitFor(w.sport) : "–"}</div>
@@ -1511,7 +1534,7 @@ function buildWorkoutItemHtml(w) {
       <div class="workout-detail-cell">
         <div class="workout-detail-label">${w.sport === "bike" ? "Ø Geschwindigkeit" : "Ø Pace"}</div>
         <div class="workout-detail-value">${computeWorkoutMetric(w.sport, w.distance, w.durationHours, w.durationMinutes, w.durationSeconds) || "–"}</div>
-      </div>
+      </div>` : ""}
       <div class="workout-detail-cell">
         <div class="workout-detail-label">Belastung</div>
         <div class="workout-detail-value">${w.load ?? "–"}</div>
@@ -1674,7 +1697,9 @@ let selectedSport = "swim";
 
 /** Distanz-Einheit je Sportart: Rad/Lauf in km, Schwimmen in Metern */
 function distanceUnitFor(sport) {
-  return sport === "swim" ? "m" : "km";
+  if (sport === "swim") return "m";
+  if (sport === "other") return null;
+  return "km";
 }
 
 /**
@@ -1719,14 +1744,42 @@ function updateWorkoutPacePreview() {
   preview.textContent = metric ? `Ø ${metric}` : "";
 }
 
+let selectedOtherType = "hit";
+
 function setSelectedSport(sport) {
   selectedSport = sport;
-  document.querySelectorAll(".sport-btn").forEach(btn => {
+  document.querySelectorAll("#sport-picker .sport-btn").forEach(btn => {
     btn.classList.toggle("selected", btn.dataset.sport === sport);
   });
-  document.getElementById("workout-distance-unit-label").textContent = `(${distanceUnitFor(sport)})`;
+
+  const distanceGroup = document.getElementById("workout-distance-group");
+  const otherTypeGroup = document.getElementById("other-type-group");
+
+  if (sport === "other") {
+    distanceGroup.style.display = "none";
+    otherTypeGroup.style.display = "block";
+    setSelectedOtherType(selectedOtherType);
+  } else {
+    distanceGroup.style.display = "block";
+    otherTypeGroup.style.display = "none";
+    document.getElementById("workout-distance-unit-label").textContent = `(${distanceUnitFor(sport)})`;
+  }
+
   updateWorkoutPacePreview();
 }
+
+function setSelectedOtherType(typeId) {
+  selectedOtherType = typeId;
+  document.querySelectorAll("#other-type-picker .sport-btn").forEach(btn => {
+    btn.classList.toggle("selected", btn.dataset.otherType === typeId);
+  });
+}
+
+document.getElementById("other-type-picker").addEventListener("click", (e) => {
+  const btn = e.target.closest(".sport-btn");
+  if (!btn) return;
+  setSelectedOtherType(btn.dataset.otherType);
+});
 
 document.getElementById("sport-picker").addEventListener("click", (e) => {
   const btn = e.target.closest(".sport-btn");
@@ -1759,6 +1812,7 @@ function openWorkoutModal(workout, workoutId) {
   state.editingWorkoutId = workoutId || null;
   document.getElementById("workout-modal-title").textContent = workout ? "Training bearbeiten" : "Training erfassen";
 
+  selectedOtherType = workout?.otherType || "hit";
   setSelectedSport(workout?.sport || "swim");
   document.getElementById("workout-title").value = workout?.title || "";
   document.getElementById("workout-calendar").value = workout?.calendarId || document.getElementById("workout-calendar").value;
@@ -1805,13 +1859,14 @@ document.getElementById("save-workout-btn").addEventListener("click", async () =
 
   const payload = {
     sport: selectedSport,
+    otherType: selectedSport === "other" ? selectedOtherType : null,
     title,
     calendarId,
     date,
     durationHours: durationHours === "" ? 0 : Number(durationHours),
     durationMinutes: durationMinutes === "" ? 0 : Number(durationMinutes),
     durationSeconds: durationSeconds === "" ? 0 : Number(durationSeconds),
-    distance: distance === "" ? null : Number(distance),
+    distance: selectedSport === "other" ? null : (distance === "" ? null : Number(distance)),
     load: load === "" ? null : Number(load),
     avgHr: avgHr === "" ? null : Number(avgHr),
     focusAerobic: Number(focusAerobic),

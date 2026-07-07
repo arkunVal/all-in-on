@@ -1,6 +1,6 @@
 /**
  * ALL-IN-ONE PRODUKTIVITÄTS-APP — app.js
- * Firebase Realtime Database · Anonyme Auth · Vanilla JS ES6+ Modules
+ * Firebase Realtime Database · E-Mail/Passwort-Login (Mehrbenutzerfähig) · Vanilla JS ES6+ Modules
  */
 
 // ═══════════════════════════════════════════════════════
@@ -12,7 +12,8 @@ import {
   getDatabase, ref, push, set, update, remove, onValue, get
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import {
-  getAuth, signInAnonymously, onAuthStateChanged
+  getAuth, onAuthStateChanged, signOut,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
@@ -30,25 +31,65 @@ const firebaseApp = initializeApp(firebaseConfig);
 const db   = getDatabase(firebaseApp);
 const auth = getAuth(firebaseApp);
 
+// Punkt 3: Jeder Nutzer bekommt seinen eigenen Datenbereich unter users/{uid}/...
+let currentUid = null;
+
 const REFS = {
-  events:    () => ref(db, "events"),
-  event:     (id) => ref(db, `events/${id}`),
-  todos:     () => ref(db, "todos"),
-  todo:      (id) => ref(db, `todos/${id}`),
-  notes:     () => ref(db, "notes"),
-  note:      (id) => ref(db, `notes/${id}`),
-  projects:  () => ref(db, "projects"),
-  project:   (id) => ref(db, `projects/${id}`),
-  calendars: () => ref(db, "calendars"),
-  calendar:  (id) => ref(db, `calendars/${id}`),
+  events:    () => ref(db, `users/${currentUid}/events`),
+  event:     (id) => ref(db, `users/${currentUid}/events/${id}`),
+  todos:     () => ref(db, `users/${currentUid}/todos`),
+  todo:      (id) => ref(db, `users/${currentUid}/todos/${id}`),
+  notes:     () => ref(db, `users/${currentUid}/notes`),
+  note:      (id) => ref(db, `users/${currentUid}/notes/${id}`),
+  projects:  () => ref(db, `users/${currentUid}/projects`),
+  project:   (id) => ref(db, `users/${currentUid}/projects/${id}`),
+  calendars: () => ref(db, `users/${currentUid}/calendars`),
+  calendar:  (id) => ref(db, `users/${currentUid}/calendars/${id}`),
   // Training-Tracking: ein Eintrag pro Tag, Schlüssel = Datum "YYYY-MM-DD"
-  checkins:  () => ref(db, "checkins"),
-  checkin:   (dateStr) => ref(db, `checkins/${dateStr}`),
-  injuries:  () => ref(db, "injuries"),
-  injury:    (id) => ref(db, `injuries/${id}`),
-  workouts:  () => ref(db, "workouts"),
-  workout:   (id) => ref(db, `workouts/${id}`)
+  checkins:  () => ref(db, `users/${currentUid}/checkins`),
+  checkin:   (dateStr) => ref(db, `users/${currentUid}/checkins/${dateStr}`),
+  injuries:  () => ref(db, `users/${currentUid}/injuries`),
+  injury:    (id) => ref(db, `users/${currentUid}/injuries/${id}`),
+  workouts:  () => ref(db, `users/${currentUid}/workouts`),
+  workout:   (id) => ref(db, `users/${currentUid}/workouts/${id}`)
 };
+
+// ═══════════════════════════════════════════════════════
+// 1b. EINMALIGE MIGRATION ALTER DATEN (aus der Zeit vor dem Mehrbenutzer-Login)
+// ═══════════════════════════════════════════════════════
+
+const LEGACY_ROOT_PATHS = ["events", "todos", "notes", "projects", "calendars", "checkins", "injuries", "workouts"];
+
+/**
+ * Kopiert einmalig die alten, nicht nutzerspezifischen Daten (aus der Zeit vor dem Login)
+ * in den persönlichen Bereich des gerade angemeldeten Nutzers. Läuft nur einmal pro Nutzer,
+ * erkennbar an der Marke users/{uid}/_migrated.
+ */
+async function migrateLegacyDataIfNeeded(uid) {
+  try {
+    const migratedSnap = await get(ref(db, `users/${uid}/_migrated`));
+    if (migratedSnap.exists() && migratedSnap.val() === true) return;
+
+    const updates = {};
+    let foundAny = false;
+
+    for (const path of LEGACY_ROOT_PATHS) {
+      const snap = await get(ref(db, path));
+      if (snap.exists()) {
+        updates[`users/${uid}/${path}`] = snap.val();
+        foundAny = true;
+      }
+    }
+
+    updates[`users/${uid}/_migrated`] = true;
+    await update(ref(db), updates);
+
+    if (foundAny) showToast("Bestehende Daten übernommen ✓");
+  } catch (e) {
+    // Migration ist ein Best-Effort-Vorgang; ein Fehler hier soll den Login nicht blockieren
+    console.warn("Migration fehlgeschlagen:", e.message);
+  }
+}
 
 // ═══════════════════════════════════════════════════════
 // 2. APP STATE
@@ -77,7 +118,8 @@ const state = {
   workouts:             {},
   openWorkoutIds:       new Set(),
   selectedZones:        new Set(), // aktuell im Trainings-Modal ausgewählte Zonen
-  editingWorkoutId:      null
+  editingWorkoutId:      null,
+  weeklyReviewOffset:    0 // 0 = aktuelle Woche, -1 = letzte Woche, etc.
 };
 
 // ═══════════════════════════════════════════════════════
@@ -220,9 +262,10 @@ let pendingDeleteAction = null;
  * Öffnet ein Bestätigungs-Modal. onConfirm wird nur ausgeführt,
  * wenn der Nutzer aktiv auf "Löschen" tippt.
  */
-function confirmDelete({ title = "Wirklich löschen?", text = "Diese Aktion kann nicht rückgängig gemacht werden.", onConfirm }) {
+function confirmDelete({ title = "Wirklich löschen?", text = "Diese Aktion kann nicht rückgängig gemacht werden.", confirmLabel = "Löschen", onConfirm }) {
   document.getElementById("confirm-title").textContent = title;
   document.getElementById("confirm-text").textContent = text;
+  document.getElementById("confirm-delete-btn").textContent = confirmLabel;
   pendingDeleteAction = onConfirm;
   openModal("modal-confirm");
 }
@@ -342,7 +385,10 @@ async function createTodo(data) {
   } catch (e) { showToast("Fehler beim Speichern: " + e.message); }
 }
 async function toggleTodo(id, currentDone) {
-  try { await update(REFS.todo(id), { done: !currentDone }); }
+  try {
+    const nowDone = !currentDone;
+    await update(REFS.todo(id), { done: nowDone, completedAt: nowDone ? Date.now() : null });
+  }
   catch (e) { showToast("Fehler: " + e.message); }
 }
 async function deleteTodo(id) {
@@ -482,6 +528,37 @@ async function deleteWorkout(id) {
 // 9. FIREBASE REALTIME LISTENER
 // ═══════════════════════════════════════════════════════
 
+/** Leert den lokalen Zustand (z.B. beim Nutzerwechsel), damit nie Daten des vorherigen Nutzers aufblitzen */
+function resetAppState() {
+  state.events = {};
+  state.todos = {};
+  state.notes = {};
+  state.projects = {};
+  state.calendars = {};
+  state.checkins = {};
+  state.injuries = {};
+  state.workouts = {};
+  state.calFilter = "all";
+  state.activeProjectId = null;
+  state.openTodoIds = new Set();
+  state.openInjuryIds = new Set();
+  state.openWorkoutIds = new Set();
+
+  renderCalendar();
+  renderWeekStrip();
+  renderDayEvents();
+  renderTodayTodos();
+  renderTodoList();
+  renderNotesList();
+  renderProjectGrid();
+  renderCalFilterBar();
+  renderTodayStats();
+  renderWeightHistory();
+  renderProgressChart();
+  renderInjuryList();
+  renderWorkoutList();
+}
+
 function initListeners() {
   onValue(REFS.events(), snap => {
     state.events = snap.exists() ? snap.val() : {};
@@ -587,6 +664,27 @@ function renderHeaderActions() {
     manageBtn.style.display = "flex";
   } else if (manageBtn) {
     manageBtn.style.display = "none";
+  }
+
+  // Punkt 1+2: Wochenrückblick-Button nur im Training-Tab
+  let weeklyBtn = document.getElementById("weekly-review-btn");
+  if (state.currentView === "training") {
+    if (!weeklyBtn) {
+      weeklyBtn = document.createElement("button");
+      weeklyBtn.id = "weekly-review-btn";
+      weeklyBtn.className = "icon-btn";
+      weeklyBtn.setAttribute("aria-label", "Wochenrückblick");
+      weeklyBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`;
+      weeklyBtn.addEventListener("click", () => {
+        state.weeklyReviewOffset = 0;
+        renderWeeklyReview();
+        openModal("modal-weekly-review");
+      });
+      right.insertBefore(weeklyBtn, document.getElementById("header-action-btn"));
+    }
+    weeklyBtn.style.display = "flex";
+  } else if (weeklyBtn) {
+    weeklyBtn.style.display = "none";
   }
 }
 
@@ -1665,6 +1763,133 @@ document.getElementById("show-all-workouts-btn").addEventListener("click", () =>
 });
 document.getElementById("close-all-workouts-btn").addEventListener("click", () => closeModal("modal-all-workouts"));
 
+// ═══════════════════════════════════════════════════════
+// 14e. WOCHENRÜCKBLICK (Punkt 1+2)
+// ═══════════════════════════════════════════════════════
+
+/** Liefert Montag & Sonntag der Woche, die `offsetWeeks` Wochen von heute entfernt liegt */
+function getWeekRange(offsetWeeks) {
+  const now = new Date();
+  const dow = now.getDay() === 0 ? 6 : now.getDay() - 1; // Montag = 0
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - dow + offsetWeeks * 7);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return {
+    startStr: toDateString(monday),
+    endStr: toDateString(sunday),
+    startMs: monday.getTime(),
+    endMs: sunday.getTime(),
+    label: `${monday.getDate()}. ${monday.toLocaleString("de-DE", { month: "short" })} – ${sunday.getDate()}. ${sunday.toLocaleString("de-DE", { month: "short" })} ${sunday.getFullYear()}`
+  };
+}
+
+function renderWeeklyReview() {
+  const range = getWeekRange(state.weeklyReviewOffset);
+  document.getElementById("weekly-review-range").textContent = range.label;
+
+  // ── Trainings der Woche ──
+  const weekWorkouts = toArray(state.workouts).filter(w => w.date >= range.startStr && w.date <= range.endStr);
+
+  let totalMinutes = 0;
+  let totalLoad = 0;
+  let aerobSum = 0, aerobCount = 0;
+  let anaerobSum = 0, anaerobCount = 0;
+  const bySport = {};
+
+  weekWorkouts.forEach(w => {
+    const mins = (Number(w.durationHours) || 0) * 60 + (Number(w.durationMinutes) || 0) + (Number(w.durationSeconds) || 0) / 60;
+    totalMinutes += mins;
+    if (w.load !== undefined && w.load !== null) totalLoad += Number(w.load);
+    if (w.focusAerobic !== undefined && w.focusAerobic !== null) { aerobSum += Number(w.focusAerobic); aerobCount++; }
+    if (w.focusAnaerobic !== undefined && w.focusAnaerobic !== null) { anaerobSum += Number(w.focusAnaerobic); anaerobCount++; }
+
+    const key = w.sport === "other" ? (w.otherType || "other") : w.sport;
+    if (!bySport[key]) bySport[key] = { count: 0, minutes: 0 };
+    bySport[key].count++;
+    bySport[key].minutes += mins;
+  });
+
+  const totalH = Math.floor(totalMinutes / 60);
+  const totalM = Math.round(totalMinutes % 60);
+  const avgAerob = aerobCount ? (aerobSum / aerobCount) : null;
+  const avgAnaerob = anaerobCount ? (anaerobSum / anaerobCount) : null;
+
+  document.getElementById("weekly-training-stats").innerHTML = `
+    <div class="stat-card">
+      <div class="stat-card-label">⏱️ Gesamtdauer</div>
+      <div class="stat-card-value">${totalMinutes > 0 ? `${totalH}h ${totalM}min` : "–"}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">🏋️ Trainings</div>
+      <div class="stat-card-value">${weekWorkouts.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">📈 Belastung (Summe)</div>
+      <div class="stat-card-value">${totalLoad > 0 ? totalLoad : "–"}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">💨 Ø Fokus Aerob</div>
+      <div class="stat-card-value">${avgAerob !== null ? avgAerob.toFixed(1) : "–"}</div>
+    </div>
+    <div class="stat-card full-width">
+      <div class="stat-card-label">🔥 Ø Fokus Anaerob</div>
+      <div class="stat-card-value">${avgAnaerob !== null ? avgAnaerob.toFixed(1) : "–"}</div>
+    </div>
+  `;
+
+  const breakdownList = document.getElementById("weekly-sport-breakdown");
+  const sportEntries = Object.entries(bySport);
+  if (!sportEntries.length) {
+    breakdownList.innerHTML = `<li class="empty-state">Keine Trainings in dieser Woche.</li>`;
+  } else {
+    breakdownList.innerHTML = sportEntries.map(([key, data]) => {
+      const info = key === "hit" || key === "athletics" || key === "mobility" ? otherTypeInfo(key) : (SPORTS[key] || { icon: "🏋️", label: key });
+      const h = Math.floor(data.minutes / 60);
+      const m = Math.round(data.minutes % 60);
+      return `
+        <li class="history-item">
+          <span class="history-date">${info.icon} ${escHtml(info.label)}</span>
+          <div class="history-values">
+            <span class="history-sleep">${data.count}×</span>
+            <span class="history-weight">${h}h ${m}min</span>
+          </div>
+        </li>`;
+    }).join("");
+  }
+
+  // ── Erledigte Aufgaben der Woche ──
+  const completedTodos = toArray(state.todos).filter(td =>
+    td.done && td.completedAt && td.completedAt >= range.startMs && td.completedAt <= range.endMs
+  ).sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
+
+  document.getElementById("weekly-todo-count-card").innerHTML = `
+    <div class="stat-card-label">✅ Erledigte Aufgaben</div>
+    <div class="stat-card-value">${completedTodos.length}</div>
+  `;
+
+  const todoList = document.getElementById("weekly-completed-todos");
+  if (!completedTodos.length) {
+    todoList.innerHTML = `<li class="empty-state">Keine erledigten Aufgaben in dieser Woche.</li>`;
+  } else {
+    todoList.innerHTML = completedTodos.map(td => buildTodoItem(td)).join("");
+    // Nur Aufklapp-Verhalten für Beschreibungen, kein Checkbox/Delete nötig hier, aber schadet nicht
+    attachTodoHandlers(todoList);
+  }
+}
+
+document.getElementById("close-weekly-review-btn").addEventListener("click", () => closeModal("modal-weekly-review"));
+document.getElementById("weekly-review-prev").addEventListener("click", () => {
+  state.weeklyReviewOffset -= 1;
+  renderWeeklyReview();
+});
+document.getElementById("weekly-review-next").addEventListener("click", () => {
+  state.weeklyReviewOffset += 1;
+  renderWeeklyReview();
+});
+
 function populateWorkoutCalendarSelect() {
   const sel = document.getElementById("workout-calendar");
   if (!sel) return;
@@ -2328,15 +2553,122 @@ function runMorningFlow() {
   }
 }
 
+// ═══════════════════════════════════════════════════════
+// 28d. AUTH-SCREEN: Login / Registrierung (Punkt 3)
+// ═══════════════════════════════════════════════════════
+
+let authMode = "login";
+
+function showAuthScreen() {
+  document.getElementById("auth-screen").classList.add("show");
+  document.getElementById("app").style.display = "none";
+}
+function hideAuthScreen() {
+  document.getElementById("auth-screen").classList.remove("show");
+  document.getElementById("app").style.display = "flex";
+}
+function setAuthError(msg) {
+  document.getElementById("auth-error").textContent = msg || "";
+}
+
+function translateAuthError(code) {
+  const map = {
+    "auth/invalid-email": "Ungültige E-Mail-Adresse.",
+    "auth/user-not-found": "Kein Konto mit dieser E-Mail gefunden.",
+    "auth/wrong-password": "Falsches Passwort.",
+    "auth/invalid-credential": "E-Mail oder Passwort ist falsch.",
+    "auth/email-already-in-use": "Für diese E-Mail existiert bereits ein Konto.",
+    "auth/weak-password": "Das Passwort muss mindestens 6 Zeichen haben.",
+    "auth/too-many-requests": "Zu viele Versuche. Bitte später erneut versuchen.",
+    "auth/network-request-failed": "Keine Verbindung. Bitte Internetverbindung prüfen."
+  };
+  return map[code] || "Etwas ist schiefgelaufen. Bitte erneut versuchen.";
+}
+
+document.getElementById("auth-toggle-btn").addEventListener("click", () => {
+  authMode = authMode === "login" ? "signup" : "login";
+  document.getElementById("auth-submit-btn").textContent = authMode === "login" ? "Anmelden" : "Registrieren";
+  document.getElementById("auth-subtitle").textContent = authMode === "login" ? "Melde dich an, um fortzufahren." : "Erstelle ein neues Konto.";
+  document.getElementById("auth-toggle-btn").textContent = authMode === "login" ? "Noch kein Konto? Registrieren" : "Bereits ein Konto? Anmelden";
+  setAuthError("");
+});
+
+document.getElementById("auth-submit-btn").addEventListener("click", async () => {
+  const email = document.getElementById("auth-email").value.trim();
+  const password = document.getElementById("auth-password").value;
+  setAuthError("");
+  if (!email || !password) { setAuthError("Bitte E-Mail und Passwort eingeben."); return; }
+
+  const btn = document.getElementById("auth-submit-btn");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Bitte warten…";
+
+  try {
+    if (authMode === "login") {
+      await signInWithEmailAndPassword(auth, email, password);
+    } else {
+      await createUserWithEmailAndPassword(auth, email, password);
+    }
+    document.getElementById("auth-password").value = "";
+  } catch (e) {
+    setAuthError(translateAuthError(e.code));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+});
+
+// ── Konto-Modal (Punkt 3: Logout) ──
+
+document.getElementById("account-btn").addEventListener("click", () => {
+  document.getElementById("account-email-display").textContent = auth.currentUser?.email || "";
+  openModal("modal-account");
+});
+document.getElementById("cancel-account-btn").addEventListener("click", () => closeModal("modal-account"));
+document.getElementById("logout-btn").addEventListener("click", () => {
+  confirmDelete({
+    title: "Abmelden?",
+    text: "Du wirst von diesem Gerät abgemeldet.",
+    confirmLabel: "Abmelden",
+    onConfirm: async () => {
+      closeModal("modal-account");
+      await signOut(auth);
+    }
+  });
+});
+
+// ── Service Worker über den aktuellen Nutzer informieren (für Hintergrund-Erinnerungen) ──
+
+function notifyServiceWorkerOfUid(uid) {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.ready.then(reg => {
+    reg.active?.postMessage({ type: "SET_UID", uid });
+  }).catch(() => {});
+}
+
+// ═══════════════════════════════════════════════════════
+// 29. APP START — Login-Status prüfen, dann pro Nutzer initialisieren
+// ═══════════════════════════════════════════════════════
+
 function init() {
   renderCalendar();
   renderWeekStrip();
   navigate("calendar");
   updateNotifBanner();
 
-  onAuthStateChanged(auth, user => {
+  onAuthStateChanged(auth, async (user) => {
     if (user) {
+      const isNewUser = currentUid !== user.uid;
+      currentUid = user.uid;
+      hideAuthScreen();
+
+      if (isNewUser) resetAppState();
+
+      await migrateLegacyDataIfNeeded(user.uid);
+      notifyServiceWorkerOfUid(user.uid);
       initListeners();
+
       // Morgen-Flow: zeigen, sobald Events, To-Dos UND Check-ins einmal geladen sind
       // (nur beim ersten Öffnen des Tages, danach nicht mehr automatisch)
       if (shouldShowBriefingToday()) {
@@ -2349,7 +2681,10 @@ function init() {
         onValue(REFS.checkins(), () => { checkinsLoaded = true; tryRunFlow(); }, { onlyOnce: true });
       }
     } else {
-      signInAnonymously(auth).catch(e => showToast("Auth-Fehler: " + e.message));
+      currentUid = null;
+      resetAppState();
+      notifyServiceWorkerOfUid(null);
+      showAuthScreen();
     }
   });
 }

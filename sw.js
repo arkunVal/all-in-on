@@ -1,15 +1,20 @@
 /**
  * Service Worker — All-in-One
- * Zuständig für: App-Caching (PWA) + Hintergrund-Erinnerungen (Punkt 1)
+ * Zuständig für: App-Caching (PWA) + Hintergrund-Erinnerungen + Mehrbenutzer-Kontext
  *
  * WICHTIG: Echte "Push"-Benachrichtigungen (auch bei komplett geschlossener App)
  * würden einen Server (Firebase Cloud Messaging + Cloud Function) erfordern.
  * Diese Lösung funktioniert clientseitig: Sie prüft periodisch fällige
  * Erinnerungen, SOLANGE der Browser/die App im Hintergrund aktiv ist
  * (z.B. Safari-Tab offen, iPhone-Bildschirm aus aber App nicht beendet).
+ *
+ * Punkt 3 (Mehrbenutzerfähigkeit): Die App teilt dem Service Worker per
+ * postMessage mit, welcher Nutzer (uid) gerade angemeldet ist. Nur für
+ * diesen Nutzer werden Erinnerungen geprüft, gespeichert in der Cache API
+ * (Service Worker haben keinen Zugriff auf den Firebase-Auth-Zustand der Seite).
  */
 
-const CACHE_NAME = "all-in-one-v1";
+const CACHE_NAME = "all-in-one-v2";
 const CHECK_INTERVAL_MS = 60 * 1000; // jede Minute prüfen
 
 const FIREBASE_DB_URL = "https://all-in-one-200f2-default-rtdb.europe-west1.firebasedatabase.app";
@@ -35,7 +40,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k !== CACHE_NAME && k !== "notified-store" && k !== "user-store").map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
@@ -52,7 +57,39 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// ── ERINNERUNGS-LOGIK (Punkt 1) ──
+// ── NUTZER-KONTEXT (Punkt 3): die Seite teilt die aktuelle uid mit ──
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SET_UID") {
+    setStoredUid(event.data.uid);
+  }
+});
+
+async function setStoredUid(uid) {
+  try {
+    const cache = await caches.open("user-store");
+    if (uid) {
+      await cache.put("uid", new Response(JSON.stringify(uid)));
+    } else {
+      await cache.delete("uid");
+    }
+  } catch {
+    // ignorieren
+  }
+}
+
+async function getStoredUid() {
+  try {
+    const cache = await caches.open("user-store");
+    const res = await cache.match("uid");
+    if (!res) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+// ── ERINNERUNGS-LOGIK ──
 
 let reminderTimer = null;
 
@@ -62,12 +99,15 @@ function startReminderLoop() {
   reminderTimer = setInterval(checkReminders, CHECK_INTERVAL_MS);
 }
 
-/** Holt einmalig Events + To-Dos via REST und prüft auf fällige Erinnerungen */
+/** Holt einmalig Events + To-Dos des aktuell angemeldeten Nutzers via REST und prüft auf fällige Erinnerungen */
 async function checkReminders() {
   try {
+    const uid = await getStoredUid();
+    if (!uid) return; // niemand angemeldet → keine Erinnerungen möglich
+
     const [eventsRes, todosRes] = await Promise.all([
-      fetch(`${FIREBASE_DB_URL}/events.json`),
-      fetch(`${FIREBASE_DB_URL}/todos.json`)
+      fetch(`${FIREBASE_DB_URL}/users/${uid}/events.json`),
+      fetch(`${FIREBASE_DB_URL}/users/${uid}/todos.json`)
     ]);
     const events = (await eventsRes.json()) || {};
     const todos  = (await todosRes.json()) || {};
@@ -80,7 +120,7 @@ async function checkReminders() {
       if (!ev.date || ev.reminderMinutes === undefined || ev.reminderMinutes === null) continue;
       const fireTime = computeFireTime(ev.date, ev.time, ev.reminderMinutes);
       if (fireTime === null) continue;
-      const key = `event:${id}`;
+      const key = `${uid}:event:${id}`;
       if (now >= fireTime && now < fireTime + 5 * 60 * 1000 && !notified.has(key)) {
         await showAppNotification(
           `🗓️ ${ev.title}`,
@@ -96,7 +136,7 @@ async function checkReminders() {
       if (!td.dueDate || td.reminderMinutes === undefined || td.reminderMinutes === null) continue;
       const fireTime = computeFireTime(td.dueDate, td.dueTime, td.reminderMinutes);
       if (fireTime === null) continue;
-      const key = `todo:${id}`;
+      const key = `${uid}:todo:${id}`;
       if (now >= fireTime && now < fireTime + 5 * 60 * 1000 && !notified.has(key)) {
         await showAppNotification(
           `✅ ${td.title}`,

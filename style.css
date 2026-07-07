@@ -1293,6 +1293,19 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
   color: var(--text-1);
 }
 
+/* Wochenrückblick: Wochen-Navigation */
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-lg);
+}
+.week-range-label {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text-0);
+}
+
 /* Kalender-Punkte für Workouts unterscheiden sich optisch leicht (Ring statt voller Punkt) */
 .event-dot.workout-dot {
   border: 1.5px solid var(--bg-2);
@@ -1373,6 +1386,66 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
   color: var(--text-2);
   margin-top: auto;
   margin-bottom: var(--space-md);
+}
+
+/* ═══════════════════════════════════════════
+   AUTH-SCREEN: Login / Registrierung (Punkt 3)
+   ═══════════════════════════════════════════ */
+
+#auth-screen {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: var(--bg-1);
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+#auth-screen.show { display: flex; }
+
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+}
+.auth-logo {
+  font-size: 48px;
+  text-align: center;
+  margin-bottom: var(--space-sm);
+}
+.auth-title {
+  font-size: 28px;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+.auth-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-1);
+  text-align: center;
+  margin-bottom: var(--space-lg);
+}
+.auth-error {
+  font-size: var(--text-sm);
+  color: var(--danger);
+  text-align: center;
+  min-height: 20px;
+  margin-bottom: var(--space-sm);
+}
+.auth-toggle-btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin-top: var(--space-md);
+}
+
+/* Account-Modal */
+.account-email {
+  font-size: var(--text-base);
+  color: var(--text-1);
+  margin-bottom: var(--space-lg);
+  word-break: break-all;
 }
 
 /* ── RESPONSIVE ── */

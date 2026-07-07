@@ -20,6 +20,29 @@
 </head>
 <body>
 
+  <!-- ===== AUTH-SCREEN (Punkt 3: Login/Registrierung) ===== -->
+  <div id="auth-screen">
+    <div class="auth-card">
+      <div class="auth-logo">🗓️</div>
+      <h1 class="auth-title">All-in-One</h1>
+      <p class="auth-subtitle" id="auth-subtitle">Melde dich an, um fortzufahren.</p>
+
+      <div class="form-group">
+        <label class="form-label" for="auth-email">E-Mail</label>
+        <input class="form-input" id="auth-email" type="email" inputmode="email" autocomplete="email" placeholder="du@beispiel.de" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="auth-password">Passwort</label>
+        <input class="form-input" id="auth-password" type="password" autocomplete="current-password" placeholder="Mind. 6 Zeichen" />
+      </div>
+
+      <p class="auth-error" id="auth-error"></p>
+
+      <button class="btn btn-primary" id="auth-submit-btn" style="width:100%">Anmelden</button>
+      <button class="text-btn auth-toggle-btn" id="auth-toggle-btn">Noch kein Konto? Registrieren</button>
+    </div>
+  </div>
+
   <div id="app">
 
     <!-- TOP HEADER -->
@@ -28,6 +51,9 @@
         <span id="header-title">Kalender</span>
       </div>
       <div class="header-right" id="header-right">
+        <button id="account-btn" class="icon-btn" aria-label="Konto">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </button>
         <button id="header-action-btn" class="icon-btn" aria-label="Hinzufügen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
@@ -498,6 +524,41 @@
     </div>
   </div>
 
+  <!-- Modal: Wochenrückblick (Punkt 1+2) -->
+  <div id="modal-weekly-review" class="modal-overlay fullscreen" role="dialog" aria-modal="true">
+    <div class="modal-sheet fullscreen">
+      <div class="modal-nav">
+        <button class="icon-btn" id="close-weekly-review-btn" aria-label="Zurück">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 class="modal-title inline">Wochenrückblick</h2>
+        <div style="width:36px"></div>
+      </div>
+
+      <div class="week-nav">
+        <button class="nav-arrow" id="weekly-review-prev" aria-label="Vorherige Woche">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="week-range-label" id="weekly-review-range"></span>
+        <button class="nav-arrow" id="weekly-review-next" aria-label="Nächste Woche">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <div class="section-header">
+        <span class="section-title">Training</span>
+      </div>
+      <div class="today-stats-grid" id="weekly-training-stats"></div>
+      <ul class="history-list" id="weekly-sport-breakdown"></ul>
+
+      <div class="section-header" style="margin-top: var(--space-lg)">
+        <span class="section-title">Erledigte Aufgaben</span>
+      </div>
+      <div class="stat-card full-width" id="weekly-todo-count-card" style="margin-bottom: var(--space-md)"></div>
+      <ul class="todo-list" id="weekly-completed-todos"></ul>
+    </div>
+  </div>
+
   <!-- Modal: Kalender-Verwaltung (Punkt 5) -->
   <div id="modal-calendar-manage" class="modal-overlay fullscreen" role="dialog" aria-modal="true">
     <div class="modal-sheet fullscreen">
@@ -511,6 +572,19 @@
         </button>
       </div>
       <ul class="calendar-list" id="calendar-list"></ul>
+    </div>
+  </div>
+
+  <!-- Modal: Konto (Punkt 3: Logout) -->
+  <div id="modal-account" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Konto</h2>
+      <p class="account-email" id="account-email-display"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancel-account-btn">Schließen</button>
+        <button class="btn btn-danger" id="logout-btn">Abmelden</button>
+      </div>
     </div>
   </div>
 

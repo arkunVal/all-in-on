@@ -184,6 +184,80 @@ body {
 .nav-label { font-size: var(--text-xs); font-weight: 500; }
 
 /* ═══════════════════════════════════════════
+   DASHBOARD-HERO (Punkt 3: persönliche Begrüßung)
+   ═══════════════════════════════════════════ */
+
+.dashboard-hero {
+  position: relative;
+  padding: var(--space-sm) 0 var(--space-lg);
+  overflow: hidden;
+}
+.hero-glow {
+  position: absolute;
+  top: -70px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 300px;
+  height: 260px;
+  background: radial-gradient(circle, rgba(108,99,255,0.32) 0%, rgba(108,99,255,0) 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+.hero-date {
+  position: relative;
+  z-index: 1;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+.hero-greeting {
+  position: relative;
+  z-index: 1;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  line-height: 1.15;
+  margin-bottom: var(--space-md);
+  background: linear-gradient(135deg, var(--text-0) 35%, var(--accent) 140%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero-summary-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.hero-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 6px 14px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-1);
+}
+.hero-chip.accent {
+  color: var(--accent);
+  border-color: var(--accent-mid);
+  background: var(--accent-dim);
+}
+.hero-chip-icon { font-size: 14px; }
+
+/* Kalender-Header direkt unter dem Hero bekommt eine dezente Abrundung nach oben */
+.cal-header-block {
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+/* ═══════════════════════════════════════════
    KALENDER — NEUES LAYOUT (Punkt 4)
    ═══════════════════════════════════════════ */
 

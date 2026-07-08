@@ -51,7 +51,8 @@ const REFS = {
   injuries:  () => ref(db, `users/${currentUid}/injuries`),
   injury:    (id) => ref(db, `users/${currentUid}/injuries/${id}`),
   workouts:  () => ref(db, `users/${currentUid}/workouts`),
-  workout:   (id) => ref(db, `users/${currentUid}/workouts/${id}`)
+  workout:   (id) => ref(db, `users/${currentUid}/workouts/${id}`),
+  profile:   () => ref(db, `users/${currentUid}/profile`)
 };
 
 // ═══════════════════════════════════════════════════════
@@ -119,7 +120,9 @@ const state = {
   openWorkoutIds:       new Set(),
   selectedZones:        new Set(), // aktuell im Trainings-Modal ausgewählte Zonen
   editingWorkoutId:      null,
-  weeklyReviewOffset:    0 // 0 = aktuelle Woche, -1 = letzte Woche, etc.
+  weeklyReviewOffset:    0, // 0 = aktuelle Woche, -1 = letzte Woche, etc.
+  profile:               {},
+  selectedMainSports:    new Set()
 };
 
 // ═══════════════════════════════════════════════════════
@@ -538,6 +541,7 @@ function resetAppState() {
   state.checkins = {};
   state.injuries = {};
   state.workouts = {};
+  state.profile = {};
   state.calFilter = "all";
   state.activeProjectId = null;
   state.openTodoIds = new Set();
@@ -557,6 +561,7 @@ function resetAppState() {
   renderProgressChart();
   renderInjuryList();
   renderWorkoutList();
+  renderDashboardHero();
 }
 
 function initListeners() {
@@ -566,6 +571,7 @@ function initListeners() {
     renderWeekStrip();
     renderDayEvents();
     renderTodayTodos();
+    renderDashboardHero();
   });
 
   onValue(REFS.todos(), snap => {
@@ -574,6 +580,7 @@ function initListeners() {
     renderTodayTodos();
     renderProjectDetail();
     populateProjectSelects();
+    renderDashboardHero();
   });
 
   onValue(REFS.notes(), snap => {
@@ -617,6 +624,11 @@ function initListeners() {
     renderInjuryList();
   });
 
+  onValue(REFS.profile(), snap => {
+    state.profile = snap.exists() ? snap.val() : {};
+    renderDashboardHero();
+  });
+
   onValue(REFS.workouts(), snap => {
     state.workouts = snap.exists() ? snap.val() : {};
     renderWorkoutList();
@@ -625,6 +637,7 @@ function initListeners() {
     renderCalendar();
     renderWeekStrip();
     renderDayEvents();
+    renderDashboardHero();
   });
 }
 
@@ -708,6 +721,39 @@ function collectCalendarItemsByDate() {
     byDate[w.date].push({ ...w, id, _type: "workout" });
   });
   return byDate;
+}
+
+// ═══════════════════════════════════════════════════════
+// 10b. DASHBOARD-HERO (Punkt 3: persönliche Begrüßung)
+// ═══════════════════════════════════════════════════════
+
+function renderDashboardHero() {
+  const now = new Date();
+  const hour = now.getHours();
+  let base = "Guten Morgen";
+  if (hour >= 11 && hour < 17) base = "Hallo";
+  else if (hour >= 17) base = "Guten Abend";
+
+  const name = state.profile?.name?.trim();
+  document.getElementById("hero-greeting").textContent = name ? `${base}, ${name}!` : `${base}!`;
+
+  const dateLabel = now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" });
+  document.getElementById("hero-date").textContent = dateLabel;
+
+  const t = today();
+  const eventCount = Object.values(state.events).filter(e => e.date === t).length;
+  const openTodoCount = toArray(state.todos).filter(td => td.dueDate === t && !td.done).length;
+  const workoutCount = toArray(state.workouts).filter(w => w.date === t).length;
+
+  const chips = [];
+  if (eventCount > 0) chips.push(`<span class="hero-chip"><span class="hero-chip-icon">🗓️</span>${eventCount} Termin${eventCount !== 1 ? "e" : ""}</span>`);
+  if (openTodoCount > 0) chips.push(`<span class="hero-chip"><span class="hero-chip-icon">✅</span>${openTodoCount} Aufgabe${openTodoCount !== 1 ? "n" : ""}</span>`);
+  if (workoutCount > 0) chips.push(`<span class="hero-chip"><span class="hero-chip-icon">🏋️</span>${workoutCount} Training${workoutCount !== 1 ? "s" : ""}</span>`);
+
+  const row = document.getElementById("hero-summary-row");
+  row.innerHTML = chips.length
+    ? chips.join("")
+    : `<span class="hero-chip accent"><span class="hero-chip-icon">✨</span>Nichts geplant heute</span>`;
 }
 
 function renderCalendar() {
@@ -1860,6 +1906,24 @@ function renderWeeklyReview() {
     }).join("");
   }
 
+  // ── Ø Flüssigkeit & Koffein der Woche ──
+  const weekCheckinDates = Object.keys(state.checkins).filter(d => d >= range.startStr && d <= range.endStr);
+  const waterEntries = weekCheckinDates.map(d => state.checkins[d].water).filter(v => v !== undefined && v !== null);
+  const caffeineEntries = weekCheckinDates.map(d => state.checkins[d].caffeine).filter(v => v !== undefined && v !== null);
+  const avgWater = waterEntries.length ? Math.round(waterEntries.reduce((a, b) => a + Number(b), 0) / waterEntries.length) : null;
+  const avgCaffeine = caffeineEntries.length ? Math.round(caffeineEntries.reduce((a, b) => a + Number(b), 0) / caffeineEntries.length) : null;
+
+  document.getElementById("weekly-intake-stats").innerHTML = `
+    <div class="stat-card">
+      <div class="stat-card-label">💧 Ø Flüssigkeit</div>
+      <div class="stat-card-value">${avgWater !== null ? avgWater : "–"}<span class="unit">ml</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">☕ Ø Koffein</div>
+      <div class="stat-card-value">${avgCaffeine !== null ? avgCaffeine : "–"}<span class="unit">mg</span></div>
+    </div>
+  `;
+
   // ── Erledigte Aufgaben der Woche ──
   const completedTodos = toArray(state.todos).filter(td =>
     td.done && td.completedAt && td.completedAt >= range.startMs && td.completedAt <= range.endMs
@@ -2619,12 +2683,68 @@ document.getElementById("auth-submit-btn").addEventListener("click", async () =>
   }
 });
 
-// ── Konto-Modal (Punkt 3: Logout) ──
+// ── Konto-Modal (Punkt 3: Logout, Punkt 1: Profil) ──
+
+/** Verfügbare Optionen für die Hauptsportarten-Auswahl im Profil */
+const MAIN_SPORT_OPTIONS = [
+  { id: "swim", label: "Swim", icon: "🏊" },
+  { id: "bike", label: "Bike", icon: "🚴" },
+  { id: "run",  label: "Run",  icon: "🏃" },
+  { id: "hit",       label: "HIT",      icon: "🔥" },
+  { id: "athletics", label: "Athletik", icon: "🏋️" },
+  { id: "mobility",  label: "Mobility", icon: "🧘" }
+];
+
+function renderMainSportsPicker() {
+  const picker = document.getElementById("main-sports-picker");
+  picker.innerHTML = MAIN_SPORT_OPTIONS.map(s =>
+    `<button type="button" class="zone-chip ${state.selectedMainSports.has(s.id) ? "selected" : ""}" data-main-sport="${s.id}">${s.icon} ${s.label}</button>`
+  ).join("");
+  picker.querySelectorAll(".zone-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const id = chip.dataset.mainSport;
+      if (state.selectedMainSports.has(id)) state.selectedMainSports.delete(id);
+      else state.selectedMainSports.add(id);
+      renderMainSportsPicker();
+    });
+  });
+}
 
 document.getElementById("account-btn").addEventListener("click", () => {
   document.getElementById("account-email-display").textContent = auth.currentUser?.email || "";
+
+  const p = state.profile || {};
+  document.getElementById("profile-name").value = p.name || "";
+  document.getElementById("profile-age").value = p.age ?? "";
+  document.getElementById("profile-weight").value = p.weight ?? "";
+  document.getElementById("profile-target-weight").value = p.targetWeight ?? "";
+  state.selectedMainSports = new Set(Array.isArray(p.mainSports) ? p.mainSports : []);
+  renderMainSportsPicker();
+
   openModal("modal-account");
 });
+
+document.getElementById("save-profile-btn").addEventListener("click", async () => {
+  const name = document.getElementById("profile-name").value.trim();
+  const age = document.getElementById("profile-age").value;
+  const weight = document.getElementById("profile-weight").value;
+  const targetWeight = document.getElementById("profile-target-weight").value;
+
+  try {
+    await update(REFS.profile(), {
+      name,
+      age: age === "" ? null : Number(age),
+      weight: weight === "" ? null : Number(weight),
+      targetWeight: targetWeight === "" ? null : Number(targetWeight),
+      mainSports: Array.from(state.selectedMainSports)
+    });
+    showToast("Profil gespeichert ✓");
+    closeModal("modal-account");
+  } catch (e) {
+    showToast("Fehler beim Speichern: " + e.message);
+  }
+});
+
 document.getElementById("cancel-account-btn").addEventListener("click", () => closeModal("modal-account"));
 document.getElementById("logout-btn").addEventListener("click", () => {
   confirmDelete({
@@ -2654,6 +2774,7 @@ function notifyServiceWorkerOfUid(uid) {
 function init() {
   renderCalendar();
   renderWeekStrip();
+  renderDashboardHero();
   navigate("calendar");
   updateNotifBanner();
 

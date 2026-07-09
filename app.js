@@ -312,11 +312,17 @@ async function createEvent(data) {
   try {
     const newRef = push(REFS.events());
     await set(newRef, { ...data, createdAt: Date.now() });
-    showToast("Event gespeichert ✓");
+    showToast("Termin gespeichert ✓");
+  } catch (e) { showToast("Fehler beim Speichern: " + e.message); }
+}
+async function updateEvent(id, data) {
+  try {
+    await update(REFS.event(id), data);
+    showToast("Termin aktualisiert ✓");
   } catch (e) { showToast("Fehler beim Speichern: " + e.message); }
 }
 async function deleteEvent(id) {
-  try { await remove(REFS.event(id)); showToast("Event gelöscht"); }
+  try { await remove(REFS.event(id)); showToast("Termin gelöscht"); }
   catch (e) { showToast("Fehler beim Löschen: " + e.message); }
 }
 
@@ -884,7 +890,7 @@ function renderDayEvents() {
     const color = calColor(e.calendarId);
     const calName = e.calendarId ? state.calendars[e.calendarId]?.name : null;
     return `
-    <li class="event-item" style="--event-color:${color}">
+    <li class="event-item" style="--event-color:${color}" data-edit-event="${id}">
       <span class="event-time">${e.time || "–"}</span>
       <div class="event-info">
         <div class="event-title-text">${escHtml(e.title)}</div>
@@ -928,16 +934,26 @@ function renderDayEvents() {
   list.innerHTML = eventsHtml + workoutsHtml;
 
   list.querySelectorAll('.delete-btn[data-kind="event"]').forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
       const ev = state.events[btn.dataset.id];
       confirmDelete({
-        title: "Event löschen?",
-        text: ev?.title ? `"${ev.title}" wird endgültig gelöscht.` : "Dieses Event wird endgültig gelöscht.",
+        title: "Termin löschen?",
+        text: ev?.title ? `"${ev.title}" wird endgültig gelöscht.` : "Dieser Termin wird endgültig gelöscht.",
         onConfirm: () => {
           const li = btn.closest("li");
           animateRemoval(li, () => deleteEvent(btn.dataset.id));
         }
       });
+    });
+  });
+
+  // Punkt 2: Klick auf einen Termin öffnet ihn zum Bearbeiten
+  list.querySelectorAll("[data-edit-event]").forEach(li => {
+    li.addEventListener("click", (e) => {
+      if (e.target.closest(".delete-btn")) return;
+      const id = li.dataset.editEvent;
+      openEventModal(state.events[id], id);
     });
   });
 
@@ -1849,8 +1865,11 @@ function renderWeeklyReview() {
     const mins = (Number(w.durationHours) || 0) * 60 + (Number(w.durationMinutes) || 0) + (Number(w.durationSeconds) || 0) / 60;
     totalMinutes += mins;
     if (w.load !== undefined && w.load !== null) totalLoad += Number(w.load);
-    if (w.focusAerobic !== undefined && w.focusAerobic !== null) { aerobSum += Number(w.focusAerobic); aerobCount++; }
-    if (w.focusAnaerobic !== undefined && w.focusAnaerobic !== null) { anaerobSum += Number(w.focusAnaerobic); anaerobCount++; }
+    // Punkt 5: "Sonstiges" (HIT/Athletik/Mobility) fließt nicht in den Ø Fokus Aerob/Anaerob ein
+    if (w.sport !== "other") {
+      if (w.focusAerobic !== undefined && w.focusAerobic !== null) { aerobSum += Number(w.focusAerobic); aerobCount++; }
+      if (w.focusAnaerobic !== undefined && w.focusAnaerobic !== null) { anaerobSum += Number(w.focusAnaerobic); anaerobCount++; }
+    }
 
     const key = w.sport === "other" ? (w.otherType || "other") : w.sport;
     if (!bySport[key]) bySport[key] = { count: 0, minutes: 0 };
@@ -2289,32 +2308,43 @@ document.getElementById("header-action-btn").addEventListener("click", () => {
   if (!m) return;
 
   if (state.currentView === "calendar") {
-    if (!Object.keys(state.calendars).length) {
-      showToast("Bitte zuerst einen Kalender anlegen");
-      openModal("modal-calendar");
-      return;
-    }
-    document.getElementById("event-date").value = state.selectedDate;
-    populateCalendarSelect();
+    openEventModal(null, null);
+    return;
   }
   if (state.currentView === "todos") document.getElementById("todo-date").value = "";
   openModal(m);
 });
 
 // ═══════════════════════════════════════════════════════
-// 19. EVENT MODAL
+// 19. TERMIN-MODAL (Punkt 1: umbenannt, Punkt 2: bearbeitbar)
 // ═══════════════════════════════════════════════════════
 
-document.getElementById("add-event-btn").addEventListener("click", () => {
+let editingEventId = null;
+
+/** Öffnet das Termin-Modal. Ohne event → neuer Termin, mit event → Bearbeiten-Modus. */
+function openEventModal(event, eventId) {
   if (!Object.keys(state.calendars).length) {
     showToast("Bitte zuerst einen Kalender anlegen");
     openModal("modal-calendar");
     return;
   }
-  document.getElementById("event-date").value = state.selectedDate;
+
+  editingEventId = eventId || null;
+  document.getElementById("event-modal-title").textContent = event ? "Termin bearbeiten" : "Termin erstellen";
+
   populateCalendarSelect();
+
+  document.getElementById("event-title").value = event?.title || "";
+  document.getElementById("event-date").value = event?.date || state.selectedDate || today();
+  document.getElementById("event-time").value = event?.time || "";
+  document.getElementById("event-desc").value = event?.description || "";
+  document.getElementById("event-reminder").value = (event?.reminderMinutes !== undefined && event?.reminderMinutes !== null) ? String(event.reminderMinutes) : "15";
+  if (event?.calendarId) document.getElementById("event-calendar").value = event.calendarId;
+
   openModal("modal-event");
-});
+}
+
+document.getElementById("add-event-btn").addEventListener("click", () => openEventModal(null, null));
 
 document.getElementById("cancel-event-btn").addEventListener("click", () => closeModal("modal-event"));
 
@@ -2329,8 +2359,17 @@ document.getElementById("save-event-btn").addEventListener("click", async () => 
   if (!title) { showToast("Bitte Titel eingeben"); shakeModal("modal-event"); return; }
   if (!date)  { showToast("Bitte Datum wählen"); shakeModal("modal-event"); return; }
   if (!calendarId) { showToast("Bitte Kalender wählen"); shakeModal("modal-event"); return; }
-  await createEvent({ title, date, time, description: desc, calendarId, reminderMinutes });
+
+  const payload = { title, date, time, description: desc, calendarId, reminderMinutes };
+
+  if (editingEventId) {
+    await updateEvent(editingEventId, payload);
+  } else {
+    await createEvent(payload);
+  }
+
   closeModal("modal-event");
+  editingEventId = null;
   ["event-title","event-time","event-desc"].forEach(id => document.getElementById(id).value = "");
 });
 
@@ -2478,6 +2517,49 @@ document.querySelectorAll(".nav-item").forEach(btn => {
     setTimeout(() => btn.classList.remove("nav-bounce"), 350);
   });
 });
+
+// ═══════════════════════════════════════════════════════
+// 27b. SWIPE-NAVIGATION ZWISCHEN TABS (Punkt 4)
+// ═══════════════════════════════════════════════════════
+
+const TAB_ORDER = ["calendar", "projects", "todos", "notes", "training"];
+
+// Container, innerhalb derer horizontales Wischen NICHT den Tab wechseln soll
+// (z.B. horizontal scrollbare Chip-Leisten)
+const SWIPE_EXCLUDE_SELECTOR = ".filter-bar, .cal-filter-bar, .week-strip, .sport-picker, .zone-picker, .intake-shortcut-grid, .color-picker";
+
+let swipeStartX = 0, swipeStartY = 0, swipeActive = false;
+
+const mainContent = document.getElementById("main-content");
+
+mainContent.addEventListener("touchstart", (e) => {
+  if (e.target.closest(SWIPE_EXCLUDE_SELECTOR)) { swipeActive = false; return; }
+  if (e.touches.length !== 1) { swipeActive = false; return; }
+  swipeStartX = e.touches[0].clientX;
+  swipeStartY = e.touches[0].clientY;
+  swipeActive = true;
+}, { passive: true });
+
+mainContent.addEventListener("touchend", (e) => {
+  if (!swipeActive) return;
+  swipeActive = false;
+  const touch = e.changedTouches[0];
+  const deltaX = touch.clientX - swipeStartX;
+  const deltaY = touch.clientY - swipeStartY;
+
+  const SWIPE_THRESHOLD = 65;
+  // Nur reagieren, wenn die Bewegung deutlich horizontaler als vertikaler Natur ist
+  if (Math.abs(deltaX) < SWIPE_THRESHOLD || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return;
+
+  const currentIndex = TAB_ORDER.indexOf(state.currentView);
+  if (currentIndex === -1) return;
+
+  if (deltaX < 0 && currentIndex < TAB_ORDER.length - 1) {
+    navigate(TAB_ORDER[currentIndex + 1]);
+  } else if (deltaX > 0 && currentIndex > 0) {
+    navigate(TAB_ORDER[currentIndex - 1]);
+  }
+}, { passive: true });
 
 // ═══════════════════════════════════════════════════════
 // 28b. MORGEN-BRIEFING (Punkt 2)

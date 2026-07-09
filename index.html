@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="All-in-One" />
-  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="theme-color" content="#111111" />
   <title>All-in-One</title>
 
   <!-- Punkt 1: App-Icons -->
@@ -113,13 +113,13 @@
           <button class="cal-filter-chip active" data-cal-id="all">Alle</button>
         </div>
 
-        <!-- Events des gewählten Tages -->
+        <!-- Termine des gewählten Tages -->
         <div class="section-header">
           <span class="section-title" id="day-events-title">Heute</span>
-          <button class="text-btn" id="add-event-btn">+ Event</button>
+          <button class="text-btn" id="add-event-btn">+ Termin</button>
         </div>
         <ul class="event-list" id="day-event-list">
-          <li class="empty-state">Keine Events für diesen Tag.</li>
+          <li class="empty-state">Keine Termine für diesen Tag.</li>
         </ul>
 
         <!-- Aufgaben heute -->
@@ -247,16 +247,16 @@
 
   <!-- ===== MODALS ===== -->
 
-  <!-- Modal: Event erstellen -->
+  <!-- Modal: Termin erstellen/bearbeiten -->
   <div id="modal-event" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
-      <h2 class="modal-title">Event erstellen</h2>
+      <h2 class="modal-title" id="event-modal-title">Termin erstellen</h2>
       <div class="form-group">
         <label class="form-label" for="event-title">Titel</label>
-        <input class="form-input" id="event-title" type="text" placeholder="Event-Titel" autocomplete="off" />
+        <input class="form-input" id="event-title" type="text" placeholder="Termin-Titel" autocomplete="off" />
       </div>
-      <!-- Punkt 5: Kalender-Auswahl im Event-Modal -->
+      <!-- Kalender-Auswahl im Termin-Modal -->
       <div class="form-group">
         <label class="form-label" for="event-calendar">Kalender</label>
         <select class="form-input form-select" id="event-calendar">
@@ -876,7 +876,7 @@
     </div>
     <div class="notif-banner-text">
       <strong>Erinnerungen aktivieren?</strong>
-      <span>Damit du Push-Benachrichtigungen für Events &amp; To-Dos bekommst.</span>
+      <span>Damit du Push-Benachrichtigungen für Termine &amp; To-Dos bekommst.</span>
     </div>
     <button class="notif-banner-btn" id="notif-enable-btn">Aktivieren</button>
     <button class="notif-banner-close" id="notif-dismiss-btn" aria-label="Schließen">

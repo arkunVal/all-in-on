@@ -52,7 +52,8 @@ const REFS = {
   injury:    (id) => ref(db, `users/${currentUid}/injuries/${id}`),
   workouts:  () => ref(db, `users/${currentUid}/workouts`),
   workout:   (id) => ref(db, `users/${currentUid}/workouts/${id}`),
-  profile:   () => ref(db, `users/${currentUid}/profile`)
+  profile:   () => ref(db, `users/${currentUid}/profile`),
+  settings:  () => ref(db, `users/${currentUid}/settings`)
 };
 
 // ═══════════════════════════════════════════════════════
@@ -122,7 +123,8 @@ const state = {
   editingWorkoutId:      null,
   weeklyReviewOffset:    0, // 0 = aktuelle Woche, -1 = letzte Woche, etc.
   profile:               {},
-  selectedMainSports:    new Set()
+  selectedMainSports:    new Set(),
+  settings:              {}
 };
 
 // ═══════════════════════════════════════════════════════
@@ -303,6 +305,49 @@ function escHtml(str) {
 function calColor(calendarId) {
   return (calendarId && state.calendars[calendarId]?.color) || "#6C63FF";
 }
+
+// ═══════════════════════════════════════════════════════
+// 3b. AKZENTFARBE (Punkt 4: Einstellungen)
+// ═══════════════════════════════════════════════════════
+
+const ACCENT_STORAGE_KEY = "allInOne_accentColor";
+
+function hexToRgb(hex) {
+  const clean = hex.replace("#", "");
+  const bigint = parseInt(clean, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function lightenColor(hex, amount) {
+  const { r, g, b } = hexToRgb(hex);
+  const nr = Math.round(r + (255 - r) * amount);
+  const ng = Math.round(g + (255 - g) * amount);
+  const nb = Math.round(b + (255 - b) * amount);
+  return `rgb(${nr}, ${ng}, ${nb})`;
+}
+
+/** Setzt die Akzentfarbe der gesamten App zur Laufzeit (alle abgeleiteten Verläufe/Glows inklusive) */
+function applyAccentColor(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const root = document.documentElement.style;
+  root.setProperty("--accent", hex);
+  root.setProperty("--accent-light", lightenColor(hex, 0.28));
+  root.setProperty("--accent-dim", `rgba(${r}, ${g}, ${b}, 0.15)`);
+  root.setProperty("--accent-mid", `rgba(${r}, ${g}, ${b}, 0.35)`);
+  root.setProperty("--accent-glow", `rgba(${r}, ${g}, ${b}, 0.4)`);
+  localStorage.setItem(ACCENT_STORAGE_KEY, hex);
+
+  document.querySelectorAll("#accent-color-picker .color-dot").forEach(dot => {
+    dot.classList.toggle("selected", dot.dataset.color.toLowerCase() === hex.toLowerCase());
+  });
+}
+
+// Sofort beim Laden die zuletzt gewählte Farbe anwenden (bevor Firebase-Daten eintreffen),
+// damit die App nicht kurz in Standard-Violett aufblitzt.
+(function applyCachedAccentColor() {
+  const cached = localStorage.getItem(ACCENT_STORAGE_KEY);
+  if (cached) applyAccentColor(cached);
+})();
 
 // ═══════════════════════════════════════════════════════
 // 4. FIREBASE CRUD — EVENTS
@@ -548,6 +593,7 @@ function resetAppState() {
   state.injuries = {};
   state.workouts = {};
   state.profile = {};
+  state.settings = {};
   state.calFilter = "all";
   state.activeProjectId = null;
   state.openTodoIds = new Set();
@@ -635,6 +681,11 @@ function initListeners() {
     renderDashboardHero();
   });
 
+  onValue(REFS.settings(), snap => {
+    state.settings = snap.exists() ? snap.val() : {};
+    if (state.settings.accentColor) applyAccentColor(state.settings.accentColor);
+  });
+
   onValue(REFS.workouts(), snap => {
     state.workouts = snap.exists() ? snap.val() : {};
     renderWorkoutList();
@@ -651,14 +702,23 @@ function initListeners() {
 // 10. SPA ROUTING
 // ═══════════════════════════════════════════════════════
 
-function navigate(viewName) {
+function navigate(viewName, direction) {
   state.currentView = viewName;
-  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-  document.getElementById(`view-${viewName}`)?.classList.add("active");
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active", "slide-in-left", "slide-in-right"));
+  const target = document.getElementById(`view-${viewName}`);
+  if (target) {
+    target.classList.add("active");
+    // Punkt 2: Richtungsanimation beim Seitenwechsel (Swipe oder Tab-Klick)
+    if (direction === "forward") {
+      target.classList.add("slide-in-right");
+    } else if (direction === "backward") {
+      target.classList.add("slide-in-left");
+    }
+  }
   document.querySelectorAll(".nav-item").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.view === viewName);
   });
-  const titles = { calendar:"Kalender", projects:"Projekte", todos:"To-Dos", notes:"Notizen", training:"Training" };
+  const titles = { calendar:"Kalender", projects:"Projekte", todos:"To-Dos", notes:"Notizen", training:"Training", settings:"Einstellungen" };
   document.getElementById("header-title").textContent = titles[viewName] || "";
   renderHeaderActions();
 }
@@ -1512,7 +1572,7 @@ function renderProgressChart() {
   // Schlafqualität ist bereits 0-100, feste Skala für konsistente Vergleichbarkeit
   const qLow = 0, qHigh = 100;
 
-  const W = 600, H = 220, padL = 8, padR = 8, padT = 12, padB = 12;
+  const W = 600, H = 220, padL = 34, padR = 34, padT = 12, padB = 12;
   const chartW = W - padL - padR, chartH = H - padT - padB;
   const n = dates.length;
   const xFor = (i) => padL + (n === 1 ? chartW / 2 : (i / (n - 1)) * chartW);
@@ -1540,6 +1600,14 @@ function renderProgressChart() {
   const firstLabel = formatDate(dates[0]);
   const lastLabel  = formatDate(dates[dates.length - 1]);
 
+  // Punkt 1: Orientierungswerte links (Gewicht, orange) & rechts (Schlafqualität, blau)
+  const axisLabels = `
+    <text x="2" y="${(padT + 4).toFixed(1)}" font-size="10" font-weight="700" fill="${CHART_COLOR_WEIGHT}">${wHigh.toFixed(1)}</text>
+    <text x="2" y="${(padT + chartH).toFixed(1)}" font-size="10" font-weight="700" fill="${CHART_COLOR_WEIGHT}">${wLow.toFixed(1)}</text>
+    <text x="${W - 2}" y="${(padT + 4).toFixed(1)}" font-size="10" font-weight="700" fill="${CHART_COLOR_SLEEP}" text-anchor="end">100</text>
+    <text x="${W - 2}" y="${(padT + chartH).toFixed(1)}" font-size="10" font-weight="700" fill="${CHART_COLOR_SLEEP}" text-anchor="end">0</text>
+  `;
+
   container.innerHTML = `
     <svg viewBox="0 0 ${W} ${H + 20}" xmlns="http://www.w3.org/2000/svg">
       ${gridLines}
@@ -1547,6 +1615,7 @@ function renderProgressChart() {
       <path d="${qualityPath}" fill="none" stroke="${CHART_COLOR_SLEEP}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
       ${weightDots}
       ${qualityDots}
+      ${axisLabels}
       <text x="${padL}" y="${H + 16}" font-size="11" fill="var(--text-2)">${escHtml(firstLabel)}</text>
       <text x="${W - padR}" y="${H + 16}" font-size="11" fill="var(--text-2)" text-anchor="end">${escHtml(lastLabel)}</text>
     </svg>`;
@@ -2456,6 +2525,31 @@ document.getElementById("add-calendar-btn").addEventListener("click", () => open
 document.getElementById("close-calendar-manage-btn").addEventListener("click", () => closeModal("modal-calendar-manage"));
 
 // ═══════════════════════════════════════════════════════
+// 26b. EINSTELLUNGEN-TAB (Punkt 4)
+// ═══════════════════════════════════════════════════════
+
+document.getElementById("accent-color-picker").addEventListener("click", async (e) => {
+  const dot = e.target.closest(".color-dot");
+  if (!dot) return;
+  const hex = dot.dataset.color;
+  applyAccentColor(hex);
+  try {
+    await update(REFS.settings(), { accentColor: hex });
+  } catch (err) {
+    showToast("Fehler beim Speichern: " + err.message);
+  }
+});
+
+document.getElementById("settings-manage-calendars-btn").addEventListener("click", () => {
+  renderCalendarManageList();
+  openModal("modal-calendar-manage");
+});
+
+document.getElementById("settings-add-calendar-btn").addEventListener("click", () => {
+  openModal("modal-calendar");
+});
+
+// ═══════════════════════════════════════════════════════
 // 24. PROJEKT-DETAIL MODAL
 // ═══════════════════════════════════════════════════════
 
@@ -2506,13 +2600,24 @@ document.getElementById("cal-next").addEventListener("click", () => {
 });
 document.getElementById("expand-toggle").addEventListener("click", toggleMonthExpand);
 
+// Punkt 1: Gewichts-/Schlaf-Liste nur bei Klick auf das Diagramm anzeigen
+let weightHistoryExpanded = false;
+document.getElementById("progress-chart-card").addEventListener("click", () => {
+  weightHistoryExpanded = !weightHistoryExpanded;
+  document.getElementById("weight-history-expand").classList.toggle("open", weightHistoryExpanded);
+  document.getElementById("chart-tap-hint").classList.toggle("open", weightHistoryExpanded);
+});
+
 // ═══════════════════════════════════════════════════════
 // 27. BOTTOM NAV
 // ═══════════════════════════════════════════════════════
 
 document.querySelectorAll(".nav-item").forEach(btn => {
   btn.addEventListener("click", () => {
-    navigate(btn.dataset.view);
+    const fromIndex = TAB_ORDER.indexOf(state.currentView);
+    const toIndex = TAB_ORDER.indexOf(btn.dataset.view);
+    const direction = toIndex > fromIndex ? "forward" : (toIndex < fromIndex ? "backward" : undefined);
+    navigate(btn.dataset.view, direction);
     btn.classList.add("nav-bounce");
     setTimeout(() => btn.classList.remove("nav-bounce"), 350);
   });
@@ -2522,7 +2627,7 @@ document.querySelectorAll(".nav-item").forEach(btn => {
 // 27b. SWIPE-NAVIGATION ZWISCHEN TABS (Punkt 4)
 // ═══════════════════════════════════════════════════════
 
-const TAB_ORDER = ["calendar", "projects", "todos", "notes", "training"];
+const TAB_ORDER = ["calendar", "projects", "todos", "notes", "training", "settings"];
 
 // Container, innerhalb derer horizontales Wischen NICHT den Tab wechseln soll
 // (z.B. horizontal scrollbare Chip-Leisten)
@@ -2555,9 +2660,9 @@ mainContent.addEventListener("touchend", (e) => {
   if (currentIndex === -1) return;
 
   if (deltaX < 0 && currentIndex < TAB_ORDER.length - 1) {
-    navigate(TAB_ORDER[currentIndex + 1]);
+    navigate(TAB_ORDER[currentIndex + 1], "forward");
   } else if (deltaX > 0 && currentIndex > 0) {
-    navigate(TAB_ORDER[currentIndex - 1]);
+    navigate(TAB_ORDER[currentIndex - 1], "backward");
   }
 }, { passive: true });
 

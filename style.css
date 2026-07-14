@@ -54,11 +54,22 @@
   --transition-base: 250ms ease;
   --transition-slow: 380ms cubic-bezier(0.32,0.72,0,1);
 
-  --safe-top:    env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top:    0px;
+  --safe-bottom: 0px;
 
   --nav-height:    64px;
   --header-height: 54px;
+}
+
+/* Punkt 1: Sicherheitsabstand (Home-Indikator) nur reservieren, wenn die App als
+   installierte PWA läuft (standalone). In einem normalen Browser-Tab kümmert sich
+   Chrome/Safari bereits selbst um die eigene Bedienleiste — würden wir zusätzlich
+   Platz reservieren, entstünde darunter eine sichtbare leere Fläche. */
+@media (display-mode: standalone) {
+  :root {
+    --safe-top:    env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 /* ── RESET ── */

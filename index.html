@@ -51,6 +51,9 @@
         <span id="header-title">Kalender</span>
       </div>
       <div class="header-right" id="header-right">
+        <button id="settings-btn" class="icon-btn" aria-label="Einstellungen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
         <button id="account-btn" class="icon-btn" aria-label="Konto">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         </button>
@@ -210,42 +213,6 @@
 
       </section>
 
-      <!-- ===== VIEW: EINSTELLUNGEN (Punkt 4) ===== -->
-      <section id="view-settings" class="view">
-
-        <div class="section-header">
-          <span class="section-title">Erscheinungsbild</span>
-        </div>
-        <div class="settings-card">
-          <div class="settings-row-label">Akzentfarbe</div>
-          <div class="color-picker" id="accent-color-picker">
-            <button class="color-dot selected" data-color="#6C63FF" style="background:#6C63FF" aria-label="Violett"></button>
-            <button class="color-dot" data-color="#4A9FF7" style="background:#4A9FF7" aria-label="Blau"></button>
-            <button class="color-dot" data-color="#43D9AD" style="background:#43D9AD" aria-label="Grün"></button>
-            <button class="color-dot" data-color="#FF6584" style="background:#FF6584" aria-label="Pink"></button>
-            <button class="color-dot" data-color="#F7A94A" style="background:#F7A94A" aria-label="Orange"></button>
-            <button class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B" aria-label="Rot"></button>
-          </div>
-        </div>
-
-        <div class="section-header" style="margin-top: var(--space-lg)">
-          <span class="section-title">Kalender</span>
-        </div>
-        <div class="settings-card">
-          <button class="settings-row" id="settings-manage-calendars-btn">
-            <span class="settings-row-icon">🗓️</span>
-            <span class="settings-row-text">Kalender verwalten</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-          <button class="settings-row" id="settings-add-calendar-btn">
-            <span class="settings-row-icon">➕</span>
-            <span class="settings-row-text">Kalender hinzufügen</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
-
-      </section>
-
     </main>
 
     <!-- BOTTOM NAVIGATION -->
@@ -283,12 +250,6 @@
           <path d="M16.5 7.5l1-1 4 4-1 1z"/><path d="M6.5 16.5l-1 1-4-4 1-1z"/>
         </svg>
         <span class="nav-label">Training</span>
-      </button>
-      <button class="nav-item" data-view="settings" aria-label="Einstellungen">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-        <span class="nav-label">Einstellungen</span>
       </button>
     </nav>
   </div>
@@ -637,6 +598,49 @@
   </div>
 
   <!-- Modal: Konto (Punkt 3: Logout) -->
+  <!-- Modal: Einstellungen (Punkt 1: verschoben vom Tab zum Zahnrad) -->
+  <div id="modal-settings" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Einstellungen</h2>
+
+      <div class="section-header">
+        <span class="section-title">Erscheinungsbild</span>
+      </div>
+      <div class="settings-card">
+        <div class="settings-row-label">Akzentfarbe</div>
+        <div class="color-picker" id="accent-color-picker">
+          <button class="color-dot selected" data-color="#6C63FF" style="background:#6C63FF" aria-label="Violett"></button>
+          <button class="color-dot" data-color="#4A9FF7" style="background:#4A9FF7" aria-label="Blau"></button>
+          <button class="color-dot" data-color="#43D9AD" style="background:#43D9AD" aria-label="Grün"></button>
+          <button class="color-dot" data-color="#FF6584" style="background:#FF6584" aria-label="Pink"></button>
+          <button class="color-dot" data-color="#F7A94A" style="background:#F7A94A" aria-label="Orange"></button>
+          <button class="color-dot" data-color="#FF6B6B" style="background:#FF6B6B" aria-label="Rot"></button>
+        </div>
+      </div>
+
+      <div class="section-header" style="margin-top: var(--space-lg)">
+        <span class="section-title">Kalender</span>
+      </div>
+      <div class="settings-card">
+        <button class="settings-row" id="settings-manage-calendars-btn">
+          <span class="settings-row-icon">🗓️</span>
+          <span class="settings-row-text">Kalender verwalten</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <button class="settings-row" id="settings-add-calendar-btn">
+          <span class="settings-row-icon">➕</span>
+          <span class="settings-row-text">Kalender hinzufügen</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="close-settings-btn" style="width:100%">Schließen</button>
+      </div>
+    </div>
+  </div>
+
   <div id="modal-account" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-sheet">
       <div class="modal-handle"></div>

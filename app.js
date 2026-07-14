@@ -718,7 +718,7 @@ function navigate(viewName, direction) {
   document.querySelectorAll(".nav-item").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.view === viewName);
   });
-  const titles = { calendar:"Kalender", projects:"Projekte", todos:"To-Dos", notes:"Notizen", training:"Training", settings:"Einstellungen" };
+  const titles = { calendar:"Kalender", projects:"Projekte", todos:"To-Dos", notes:"Notizen", training:"Training" };
   document.getElementById("header-title").textContent = titles[viewName] || "";
   renderHeaderActions();
 }
@@ -726,24 +726,6 @@ function navigate(viewName, direction) {
 /** Punkt 5: Im Kalender-View zusätzlich einen "Kalender verwalten"-Button anzeigen */
 function renderHeaderActions() {
   const right = document.getElementById("header-right");
-  let manageBtn = document.getElementById("manage-calendars-btn");
-  if (state.currentView === "calendar") {
-    if (!manageBtn) {
-      manageBtn = document.createElement("button");
-      manageBtn.id = "manage-calendars-btn";
-      manageBtn.className = "icon-btn";
-      manageBtn.setAttribute("aria-label", "Kalender verwalten");
-      manageBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
-      manageBtn.addEventListener("click", () => {
-        renderCalendarManageList();
-        openModal("modal-calendar-manage");
-      });
-      right.insertBefore(manageBtn, document.getElementById("header-action-btn"));
-    }
-    manageBtn.style.display = "flex";
-  } else if (manageBtn) {
-    manageBtn.style.display = "none";
-  }
 
   // Punkt 1+2: Wochenrückblick-Button nur im Training-Tab
   let weeklyBtn = document.getElementById("weekly-review-btn");
@@ -2627,7 +2609,7 @@ document.querySelectorAll(".nav-item").forEach(btn => {
 // 27b. SWIPE-NAVIGATION ZWISCHEN TABS (Punkt 4)
 // ═══════════════════════════════════════════════════════
 
-const TAB_ORDER = ["calendar", "projects", "todos", "notes", "training", "settings"];
+const TAB_ORDER = ["calendar", "projects", "todos", "notes", "training"];
 
 // Container, innerhalb derer horizontales Wischen NICHT den Tab wechseln soll
 // (z.B. horizontal scrollbare Chip-Leisten)
@@ -2896,6 +2878,11 @@ function renderMainSportsPicker() {
     });
   });
 }
+
+document.getElementById("settings-btn").addEventListener("click", () => {
+  openModal("modal-settings");
+});
+document.getElementById("close-settings-btn").addEventListener("click", () => closeModal("modal-settings"));
 
 document.getElementById("account-btn").addEventListener("click", () => {
   document.getElementById("account-email-display").textContent = auth.currentUser?.email || "";

@@ -614,6 +614,7 @@ function resetAppState() {
   renderInjuryList();
   renderWorkoutList();
   renderDashboardHero();
+  renderActivityHeatmap();
 }
 
 function initListeners() {
@@ -633,6 +634,7 @@ function initListeners() {
     renderProjectDetail();
     populateProjectSelects();
     renderDashboardHero();
+    renderActivityHeatmap();
   });
 
   onValue(REFS.notes(), snap => {
@@ -666,6 +668,8 @@ function initListeners() {
     renderTodayStats();
     renderWeightHistory();
     renderProgressChart();
+    renderActivityHeatmap();
+    renderDashboardHero();
     if (document.getElementById("modal-intake").classList.contains("open")) {
       renderIntakeRing(activeIntakeType);
     }
@@ -695,6 +699,7 @@ function initListeners() {
     renderWeekStrip();
     renderDayEvents();
     renderDashboardHero();
+    renderActivityHeatmap();
   });
 }
 
@@ -775,6 +780,30 @@ function collectCalendarItemsByDate() {
 // 10b. DASHBOARD-HERO (Punkt 3: persönliche Begrüßung)
 // ═══════════════════════════════════════════════════════
 
+/** Punkt 1 (Redesign): Streak = Anzahl aufeinanderfolgender Tage bis heute mit
+    mindestens einer Aktivität (Training geloggt, Aufgabe erledigt, oder Check-in) */
+function calculateStreak() {
+  const activeDates = new Set();
+  toArray(state.workouts).forEach(w => { if (w.date) activeDates.add(w.date); });
+  toArray(state.todos).forEach(td => {
+    if (td.completedAt) activeDates.add(toDateString(new Date(td.completedAt)));
+  });
+  Object.keys(state.checkins).forEach(dateStr => {
+    const c = state.checkins[dateStr];
+    if (c && (c.weight || c.sleepHours || c.water || c.caffeine)) activeDates.add(dateStr);
+  });
+
+  let streak = 0;
+  let cursor = new Date();
+  // Wenn heute noch nichts erfasst wurde, zählt der Streak trotzdem ab gestern weiter
+  if (!activeDates.has(toDateString(cursor))) cursor.setDate(cursor.getDate() - 1);
+  while (activeDates.has(toDateString(cursor))) {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
 function renderDashboardHero() {
   const now = new Date();
   const hour = now.getHours();
@@ -791,17 +820,23 @@ function renderDashboardHero() {
   const t = today();
   const eventCount = Object.values(state.events).filter(e => e.date === t).length;
   const openTodoCount = toArray(state.todos).filter(td => td.dueDate === t && !td.done).length;
-  const workoutCount = toArray(state.workouts).filter(w => w.date === t).length;
-
-  const chips = [];
-  if (eventCount > 0) chips.push(`<span class="hero-chip"><span class="hero-chip-icon">🗓️</span>${eventCount} Termin${eventCount !== 1 ? "e" : ""}</span>`);
-  if (openTodoCount > 0) chips.push(`<span class="hero-chip"><span class="hero-chip-icon">✅</span>${openTodoCount} Aufgabe${openTodoCount !== 1 ? "n" : ""}</span>`);
-  if (workoutCount > 0) chips.push(`<span class="hero-chip"><span class="hero-chip-icon">🏋️</span>${workoutCount} Training${workoutCount !== 1 ? "s" : ""}</span>`);
+  const streak = calculateStreak();
 
   const row = document.getElementById("hero-summary-row");
-  row.innerHTML = chips.length
-    ? chips.join("")
-    : `<span class="hero-chip accent"><span class="hero-chip-icon">✨</span>Nichts geplant heute</span>`;
+  row.innerHTML = `
+    <div class="hero-stat-pill">
+      <div class="hero-stat-top"><span class="hero-stat-icon">🔥</span><span class="hero-stat-label">Streak</span></div>
+      <div class="hero-stat-value ${streak > 0 ? "accent" : ""}">${streak}</div>
+    </div>
+    <div class="hero-stat-pill">
+      <div class="hero-stat-top"><span class="hero-stat-icon">🗓️</span><span class="hero-stat-label">Termine</span></div>
+      <div class="hero-stat-value">${eventCount}</div>
+    </div>
+    <div class="hero-stat-pill">
+      <div class="hero-stat-top"><span class="hero-stat-icon">✅</span><span class="hero-stat-label">Offen</span></div>
+      <div class="hero-stat-value ${openTodoCount === 0 ? "good" : ""}">${openTodoCount}</div>
+    </div>
+  `;
 }
 
 function renderCalendar() {
@@ -1302,6 +1337,44 @@ function qualityColor(q) {
   return "var(--danger)";
 }
 
+/** Zählt, wie viele Aktivitätsarten (Training/Check-in/erledigte Aufgabe) an einem Tag stattfanden (0-3) */
+function computeDayActivityLevel(dateStr) {
+  let count = 0;
+  if (toArray(state.workouts).some(w => w.date === dateStr)) count++;
+  const c = state.checkins[dateStr];
+  if (c && (c.weight || c.sleepHours || c.water || c.caffeine)) count++;
+  if (toArray(state.todos).some(td => td.completedAt && toDateString(new Date(td.completedAt)) === dateStr)) count++;
+  return count;
+}
+
+/** Rendert die 5-Wochen-Aktivitäts-Heatmap im Training-Tab (Redesign, an Bild 1 angelehnt) */
+function renderActivityHeatmap() {
+  const container = document.getElementById("activity-heatmap-grid");
+  if (!container) return;
+
+  const now = new Date();
+  const dow = now.getDay() === 0 ? 6 : now.getDay() - 1; // Montag = 0
+  const thisMonday = new Date(now);
+  thisMonday.setDate(now.getDate() - dow);
+  const startMonday = new Date(thisMonday);
+  startMonday.setDate(thisMonday.getDate() - 28); // 4 weitere Wochen zurück = 5 Wochen gesamt
+
+  const t = today();
+  let html = "";
+  for (let i = 0; i < 35; i++) {
+    const d = new Date(startMonday);
+    d.setDate(startMonday.getDate() + i);
+    const ds = toDateString(d);
+    if (ds > t) {
+      html += `<div class="heat-cell heat-future"></div>`;
+    } else {
+      const level = Math.min(computeDayActivityLevel(ds), 3);
+      html += `<div class="heat-cell ${level > 0 ? "heat-" + level : ""}" title="${formatDate(ds)}"></div>`;
+    }
+  }
+  container.innerHTML = html;
+}
+
 function renderTodayStats() {
   const grid = document.getElementById("today-stats-grid");
   const t = today();
@@ -1783,10 +1856,31 @@ function buildWorkoutItemHtml(w) {
             <span class="workout-badge">${formatWorkoutDuration(w.durationHours, w.durationMinutes, w.durationSeconds)}</span>
             ${calName ? `<span class="workout-badge">${escHtml(calName)}</span>` : ""}
           </div>
+          ${buildZoneBarHtml(zones)}
         </div>
       </div>
       ${detailHtml}
     </li>`;
+}
+
+/** Farbige Segment-Leiste für die Zonen eines Trainings (Redesign, an Bild 2 angelehnt) */
+const ZONE_COLORS = {
+  z1_erholung: "#43D9AD",
+  z2_ausdauer: "#4A9FF7",
+  z2_fatmax:   "#4A9FF7",
+  z3_tempo:    "#F7B731",
+  z4_schwelle: "#FF9F43",
+  z5_vo2max:   "#FF6B6B",
+  z5_neuro:    "#B463FF",
+  z5_anaerob:  "#FF4D9E",
+};
+
+function buildZoneBarHtml(zones) {
+  if (!zones.length) return "";
+  const segments = zones.map(z =>
+    `<span class="zone-bar-segment" style="background:${ZONE_COLORS[z] || "var(--accent)"}"></span>`
+  ).join("");
+  return `<div class="workout-zone-bar">${segments}</div>`;
 }
 
 /** Verkabelt Aufklappen/Bearbeiten/Löschen für eine gerenderte Trainings-Liste */
@@ -2880,11 +2974,6 @@ function renderMainSportsPicker() {
 }
 
 document.getElementById("settings-btn").addEventListener("click", () => {
-  openModal("modal-settings");
-});
-document.getElementById("close-settings-btn").addEventListener("click", () => closeModal("modal-settings"));
-
-document.getElementById("account-btn").addEventListener("click", () => {
   document.getElementById("account-email-display").textContent = auth.currentUser?.email || "";
 
   const p = state.profile || {};
@@ -2895,8 +2984,9 @@ document.getElementById("account-btn").addEventListener("click", () => {
   state.selectedMainSports = new Set(Array.isArray(p.mainSports) ? p.mainSports : []);
   renderMainSportsPicker();
 
-  openModal("modal-account");
+  openModal("modal-settings");
 });
+document.getElementById("close-settings-btn").addEventListener("click", () => closeModal("modal-settings"));
 
 document.getElementById("save-profile-btn").addEventListener("click", async () => {
   const name = document.getElementById("profile-name").value.trim();
@@ -2913,20 +3003,19 @@ document.getElementById("save-profile-btn").addEventListener("click", async () =
       mainSports: Array.from(state.selectedMainSports)
     });
     showToast("Profil gespeichert ✓");
-    closeModal("modal-account");
+    closeModal("modal-settings");
   } catch (e) {
     showToast("Fehler beim Speichern: " + e.message);
   }
 });
 
-document.getElementById("cancel-account-btn").addEventListener("click", () => closeModal("modal-account"));
 document.getElementById("logout-btn").addEventListener("click", () => {
   confirmDelete({
     title: "Abmelden?",
     text: "Du wirst von diesem Gerät abgemeldet.",
     confirmLabel: "Abmelden",
     onConfirm: async () => {
-      closeModal("modal-account");
+      closeModal("modal-settings");
       await signOut(auth);
     }
   });

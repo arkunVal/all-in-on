@@ -54,9 +54,6 @@
         <button id="settings-btn" class="icon-btn" aria-label="Einstellungen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
-        <button id="account-btn" class="icon-btn" aria-label="Konto">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        </button>
         <button id="header-action-btn" class="icon-btn" aria-label="Hinzufügen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
@@ -162,6 +159,22 @@
 
       <!-- ===== VIEW: TRAINING ===== -->
       <section id="view-training" class="view">
+
+        <!-- Aktivitäts-Heatmap (Redesign, an Bild 1 angelehnt) -->
+        <div class="heatmap-card">
+          <div class="heatmap-card-header">
+            <div>
+              <div class="heatmap-title">Aktivität</div>
+              <div class="heatmap-subtitle">Letzte 5 Wochen</div>
+            </div>
+          </div>
+          <div class="activity-heatmap-grid" id="activity-heatmap-grid"></div>
+          <div class="heatmap-legend">
+            <span><span class="heat-dot heat-1"></span>1 Aktivität</span>
+            <span><span class="heat-dot heat-2"></span>2 Aktivitäten</span>
+            <span><span class="heat-dot heat-3"></span>3+ Aktivitäten</span>
+          </div>
+        </div>
 
         <!-- Heutiger Status -->
         <div class="section-header">
@@ -603,8 +616,35 @@
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <h2 class="modal-title">Einstellungen</h2>
+      <p class="account-email" id="account-email-display"></p>
 
       <div class="section-header">
+        <span class="section-title">Profil</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="profile-name">Name</label>
+        <input class="form-input" id="profile-name" type="text" placeholder="Dein Name" autocomplete="name" />
+      </div>
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label class="form-label" for="profile-age">Alter</label>
+          <input class="form-input" id="profile-age" type="number" inputmode="numeric" min="0" step="1" placeholder="Jahre" />
+        </div>
+        <div class="form-group flex-1">
+          <label class="form-label" for="profile-weight">Gewicht (kg)</label>
+          <input class="form-input" id="profile-weight" type="number" inputmode="decimal" min="0" step="0.1" placeholder="z.B. 72" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="profile-target-weight">Zielgewicht (kg)</label>
+        <input class="form-input" id="profile-target-weight" type="number" inputmode="decimal" min="0" step="0.1" placeholder="z.B. 70" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Hauptsportarten</label>
+        <div class="zone-picker" id="main-sports-picker"></div>
+      </div>
+
+      <div class="section-header" style="margin-top: var(--space-lg)">
         <span class="section-title">Erscheinungsbild</span>
       </div>
       <div class="settings-card">
@@ -636,46 +676,7 @@
       </div>
 
       <div class="modal-actions">
-        <button class="btn btn-ghost" id="close-settings-btn" style="width:100%">Schließen</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modal-account" class="modal-overlay" role="dialog" aria-modal="true">
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <h2 class="modal-title">Konto</h2>
-      <p class="account-email" id="account-email-display"></p>
-
-      <div class="section-header">
-        <span class="section-title">Profil</span>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label" for="profile-name">Name</label>
-        <input class="form-input" id="profile-name" type="text" placeholder="Dein Name" autocomplete="name" />
-      </div>
-      <div class="form-row">
-        <div class="form-group flex-1">
-          <label class="form-label" for="profile-age">Alter</label>
-          <input class="form-input" id="profile-age" type="number" inputmode="numeric" min="0" step="1" placeholder="Jahre" />
-        </div>
-        <div class="form-group flex-1">
-          <label class="form-label" for="profile-weight">Gewicht (kg)</label>
-          <input class="form-input" id="profile-weight" type="number" inputmode="decimal" min="0" step="0.1" placeholder="z.B. 72" />
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="profile-target-weight">Zielgewicht (kg)</label>
-        <input class="form-input" id="profile-target-weight" type="number" inputmode="decimal" min="0" step="0.1" placeholder="z.B. 70" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Hauptsportarten</label>
-        <div class="zone-picker" id="main-sports-picker"></div>
-      </div>
-
-      <div class="modal-actions">
-        <button class="btn btn-ghost" id="cancel-account-btn">Schließen</button>
+        <button class="btn btn-ghost" id="close-settings-btn">Schließen</button>
         <button class="btn btn-primary" id="save-profile-btn">Speichern</button>
       </div>
       <button class="text-btn intake-reset-btn" id="logout-btn" style="color:var(--danger)">Abmelden</button>

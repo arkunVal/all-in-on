@@ -1865,14 +1865,14 @@ function buildWorkoutItemHtml(w) {
 
 /** Farbige Segment-Leiste für die Zonen eines Trainings (Redesign, an Bild 2 angelehnt) */
 const ZONE_COLORS = {
-  z1_erholung: "#43D9AD",
-  z2_ausdauer: "#4A9FF7",
-  z2_fatmax:   "#4A9FF7",
-  z3_tempo:    "#F7B731",
-  z4_schwelle: "#FF9F43",
-  z5_vo2max:   "#FF6B6B",
-  z5_neuro:    "#B463FF",
-  z5_anaerob:  "#FF4D9E",
+  z1_erholung: "#1B3A6B", // Dunkelblau
+  z2_ausdauer: "#2F6FED", // Blau
+  z2_fatmax:   "#6FA8FF", // Helleres Blau
+  z3_tempo:    "#2DD4BF", // Türkis
+  z4_schwelle: "#6EE7A8", // Helleres Grün
+  z5_vo2max:   "#FFD93D", // Gelb
+  z5_neuro:    "#EF4444", // Rot
+  z5_anaerob:  "#FFD93D", // Gelb
 };
 
 function buildZoneBarHtml(zones) {
@@ -2073,9 +2073,12 @@ function renderWeeklyReview() {
   // ── Ø Flüssigkeit & Koffein der Woche ──
   const weekCheckinDates = Object.keys(state.checkins).filter(d => d >= range.startStr && d <= range.endStr);
   const waterEntries = weekCheckinDates.map(d => state.checkins[d].water).filter(v => v !== undefined && v !== null);
-  const caffeineEntries = weekCheckinDates.map(d => state.checkins[d].caffeine).filter(v => v !== undefined && v !== null);
   const avgWater = waterEntries.length ? Math.round(waterEntries.reduce((a, b) => a + Number(b), 0) / waterEntries.length) : null;
-  const avgCaffeine = caffeineEntries.length ? Math.round(caffeineEntries.reduce((a, b) => a + Number(b), 0) / caffeineEntries.length) : null;
+
+  // Punkt 2: Beim Koffein zählen auch Tage ohne Eintrag als 0 mit (fester Nenner = 7 Tage/Woche)
+  const caffeineValues = weekCheckinDates.map(d => state.checkins[d].caffeine).filter(v => v !== undefined && v !== null);
+  const caffeineSum = caffeineValues.reduce((a, b) => a + Number(b), 0);
+  const avgCaffeine = Math.round(caffeineSum / 7);
 
   document.getElementById("weekly-intake-stats").innerHTML = `
     <div class="stat-card">

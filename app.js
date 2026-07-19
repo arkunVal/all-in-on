@@ -1458,9 +1458,19 @@ const INTAKE_CONFIG = {
 };
 
 let activeIntakeType = "water";
+let intakeViewDate = today(); // Punkt 1: aktuell betrachtetes Datum im Tracker
 
 function currentIntakeValue(type) {
-  return state.checkins[today()]?.[type] || 0;
+  return state.checkins[intakeViewDate]?.[type] || 0;
+}
+
+/** Zeigt "Heute", "Gestern" oder das ausgeschriebene Datum für den Tracker-Header */
+function formatIntakeDateLabel(dateStr) {
+  if (dateStr === today()) return "Heute";
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (dateStr === toDateString(yesterday)) return "Gestern";
+  return formatDate(dateStr);
 }
 
 function renderIntakeRing(type) {
@@ -1485,6 +1495,10 @@ function renderIntakeRing(type) {
       <text x="${cx}" y="${cy + 34}" text-anchor="middle" class="intake-ring-unit">${cfg.unit}</text>
       <text x="${cx}" y="${cy + 58}" text-anchor="middle" class="intake-ring-goal">Ziel: ${cfg.goal} ${cfg.unit}</text>
     </svg>`;
+
+  document.getElementById("intake-date-label").textContent = formatIntakeDateLabel(intakeViewDate);
+  document.getElementById("intake-next-day").disabled = intakeViewDate >= today();
+  document.getElementById("intake-next-day").style.opacity = intakeViewDate >= today() ? 0.35 : 1;
 }
 
 function renderIntakeShortcuts(type) {
@@ -1502,7 +1516,7 @@ function renderIntakeShortcuts(type) {
     btn.addEventListener("click", async () => {
       const amount = Number(btn.dataset.amount);
       const current = currentIntakeValue(activeIntakeType);
-      await saveCheckin(today(), { [activeIntakeType]: Math.max(0, current + amount) });
+      await saveCheckin(intakeViewDate, { [activeIntakeType]: Math.max(0, current + amount) });
       renderIntakeRing(activeIntakeType);
     });
   });
@@ -1510,6 +1524,7 @@ function renderIntakeShortcuts(type) {
 
 function openIntakeDetail(type) {
   activeIntakeType = type;
+  intakeViewDate = today(); // jedes Öffnen startet wieder bei heute
   const cfg = INTAKE_CONFIG[type];
   document.getElementById("intake-title").textContent = cfg.label;
   document.getElementById("intake-manual-input").value = "";
@@ -1518,6 +1533,44 @@ function openIntakeDetail(type) {
   openModal("modal-intake");
 }
 
+/** Wechselt das im Tracker angezeigte Datum um `delta` Tage (Punkt 1: rückwirkendes Tracking) */
+function shiftIntakeDate(delta) {
+  const d = new Date(intakeViewDate + "T00:00:00");
+  d.setDate(d.getDate() + delta);
+  const newDate = toDateString(d);
+  if (newDate > today()) return; // nicht in die Zukunft
+  intakeViewDate = newDate;
+  renderIntakeRing(activeIntakeType);
+}
+
+document.getElementById("intake-prev-day").addEventListener("click", () => shiftIntakeDate(-1));
+document.getElementById("intake-next-day").addEventListener("click", () => shiftIntakeDate(1));
+
+// Punkt 1: Wischen nach links/rechts über den Ring wechselt den Tag
+(function setupIntakeSwipe() {
+  const wrapper = document.getElementById("intake-ring-wrapper");
+  let startX = 0, startY = 0, active = false;
+
+  wrapper.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) { active = false; return; }
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    active = true;
+  }, { passive: true });
+
+  wrapper.addEventListener("touchend", (e) => {
+    if (!active) return;
+    active = false;
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - startX;
+    const deltaY = touch.clientY - startY;
+    const THRESHOLD = 40;
+    if (Math.abs(deltaX) < THRESHOLD || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return;
+    // Wischen nach links → nächster Tag, nach rechts → vorheriger Tag
+    shiftIntakeDate(deltaX < 0 ? 1 : -1);
+  }, { passive: true });
+})();
+
 document.getElementById("close-intake-btn").addEventListener("click", () => closeModal("modal-intake"));
 
 document.getElementById("intake-manual-add-btn").addEventListener("click", async () => {
@@ -1525,18 +1578,19 @@ document.getElementById("intake-manual-add-btn").addEventListener("click", async
   const amount = Number(input.value);
   if (!amount || amount === 0) { showToast("Bitte eine Menge eingeben"); shakeModal("modal-intake"); return; }
   const current = currentIntakeValue(activeIntakeType);
-  await saveCheckin(today(), { [activeIntakeType]: Math.max(0, current + amount) });
+  await saveCheckin(intakeViewDate, { [activeIntakeType]: Math.max(0, current + amount) });
   input.value = "";
   renderIntakeRing(activeIntakeType);
 });
 
 document.getElementById("intake-reset-btn").addEventListener("click", () => {
   const cfg = INTAKE_CONFIG[activeIntakeType];
+  const dayLabel = formatIntakeDateLabel(intakeViewDate);
   confirmDelete({
     title: `${cfg.label} zurücksetzen?`,
-    text: `Der heutige Wert für ${cfg.label} wird auf 0 gesetzt.`,
+    text: `Der Wert für ${cfg.label} (${dayLabel}) wird auf 0 gesetzt.`,
     onConfirm: async () => {
-      await saveCheckin(today(), { [activeIntakeType]: 0 });
+      await saveCheckin(intakeViewDate, { [activeIntakeType]: 0 });
       renderIntakeRing(activeIntakeType);
     }
   });

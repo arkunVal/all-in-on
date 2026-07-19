@@ -522,7 +522,18 @@
         <div style="width:36px"></div>
       </div>
 
-      <div class="intake-ring-wrapper">
+      <!-- Punkt 1: Datums-Navigation für rückwirkendes Tracking -->
+      <div class="intake-date-nav">
+        <button class="nav-arrow" id="intake-prev-day" aria-label="Vorheriger Tag">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="intake-date-label" id="intake-date-label">Heute</span>
+        <button class="nav-arrow" id="intake-next-day" aria-label="Nächster Tag">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <div class="intake-ring-wrapper" id="intake-ring-wrapper">
         <div id="intake-ring-container"></div>
       </div>
 
@@ -536,7 +547,7 @@
       </div>
       <div class="intake-shortcut-grid" id="intake-shortcut-grid"></div>
 
-      <button class="text-btn intake-reset-btn" id="intake-reset-btn">Heute zurücksetzen</button>
+      <button class="text-btn intake-reset-btn" id="intake-reset-btn">Zurücksetzen</button>
     </div>
   </div>
 

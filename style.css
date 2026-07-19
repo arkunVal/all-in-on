@@ -1587,11 +1587,27 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
   flex-direction: column;
 }
 
+/* Punkt 1: Datums-Navigation für rückwirkendes Tracking */
+.intake-date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding-top: var(--space-sm);
+}
+.intake-date-label {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text-0);
+  min-width: 140px;
+  text-align: center;
+}
 .intake-ring-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-lg) 0 var(--space-md);
+  touch-action: pan-y;
 }
 
 #intake-ring-container svg { display: block; }

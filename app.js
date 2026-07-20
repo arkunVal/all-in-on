@@ -1365,8 +1365,6 @@ function qualityColor(q) {
 function computeDayActivityLevel(dateStr) {
   let count = 0;
   if (toArray(state.workouts).some(w => w.date === dateStr)) count++;
-  const c = state.checkins[dateStr];
-  if (c && (c.weight || c.sleepHours || c.water || c.caffeine)) count++;
   if (toArray(state.todos).some(td => td.completedAt && toDateString(new Date(td.completedAt)) === dateStr)) count++;
   return count;
 }
@@ -2430,13 +2428,13 @@ function renderProjectGrid() {
     return;
   }
   grid.innerHTML = projects.map(p => {
-    const todoCount = toArray(state.todos).filter(t => t.projectId === p.id).length;
+    const todoCount = toArray(state.todos).filter(t => t.projectId === p.id && !t.done).length;
     const noteCount = toArray(state.notes).filter(n => n.projectId === p.id).length;
     return `
       <div class="project-card" data-id="${p.id}" style="--project-color:${p.color || "var(--accent)"}">
         <div class="project-color-dot"></div>
         <div class="project-card-name">${escHtml(p.name)}</div>
-        <div class="project-card-count">${todoCount} To-Do${todoCount!==1?"s":""} · ${noteCount} Notiz${noteCount!==1?"en":""}</div>
+        <div class="project-card-count">${todoCount} offene To-Do${todoCount!==1?"s":""} · ${noteCount} Notiz${noteCount!==1?"en":""}</div>
       </div>`;
   }).join("");
   grid.querySelectorAll(".project-card").forEach(card => {

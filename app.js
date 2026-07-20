@@ -759,21 +759,46 @@ function renderHeaderActions() {
 // ═══════════════════════════════════════════════════════
 
 /** Sammelt Events + Workouts gruppiert nach Datum, gefiltert nach aktivem Kalender-Filter */
-function collectCalendarItemsByDate() {
-  const byDate = {};
+/** Anzahl Tage zwischen zwei "YYYY-MM-DD"-Daten (b - a) */
+function daysBetweenDates(dateStrA, dateStrB) {
+  const a = new Date(dateStrA + "T00:00:00");
+  const b = new Date(dateStrB + "T00:00:00");
+  return Math.round((b - a) / (1000 * 60 * 60 * 24));
+}
+
+/** Punkt 1: Prüft, ob ein Termin (ggf. wiederkehrend) an einem bestimmten Datum stattfindet */
+function eventOccursOnDate(e, dateStr) {
+  if (!e.date) return false;
+  if (dateStr < e.date) return false; // vor dem ersten Auftreten gibt's nie eine Wiederholung
+  if (!e.recurrence || e.recurrence === "none") return e.date === dateStr;
+
+  const daysDiff = daysBetweenDates(e.date, dateStr);
+  switch (e.recurrence) {
+    case "daily":      return true;
+    case "every2days": return daysDiff % 2 === 0;
+    case "weekly":     return daysDiff % 7 === 0;
+    case "yearly": {
+      const anchor = new Date(e.date + "T00:00:00");
+      const d = new Date(dateStr + "T00:00:00");
+      return anchor.getMonth() === d.getMonth() && anchor.getDate() === d.getDate();
+    }
+    default: return e.date === dateStr;
+  }
+}
+
+/** Liefert alle Termine + Trainings, die an einem bestimmten Datum vorkommen (inkl. Wiederholungen) */
+function getCalendarItemsForDate(dateStr) {
+  const items = [];
   Object.entries(state.events).forEach(([id, e]) => {
-    if (!e.date) return;
     if (state.calFilter !== "all" && e.calendarId !== state.calFilter) return;
-    if (!byDate[e.date]) byDate[e.date] = [];
-    byDate[e.date].push({ ...e, id, _type: "event" });
+    if (eventOccursOnDate(e, dateStr)) items.push({ ...e, id, _type: "event" });
   });
   Object.entries(state.workouts).forEach(([id, w]) => {
-    if (!w.date) return;
+    if (!w.date || w.date !== dateStr) return;
     if (state.calFilter !== "all" && w.calendarId !== state.calFilter) return;
-    if (!byDate[w.date]) byDate[w.date] = [];
-    byDate[w.date].push({ ...w, id, _type: "workout" });
+    items.push({ ...w, id, _type: "workout" });
   });
-  return byDate;
+  return items;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -818,7 +843,7 @@ function renderDashboardHero() {
   document.getElementById("hero-date").textContent = dateLabel;
 
   const t = today();
-  const eventCount = Object.values(state.events).filter(e => e.date === t).length;
+  const eventCount = Object.values(state.events).filter(e => eventOccursOnDate(e, t)).length;
   const openTodoCount = toArray(state.todos).filter(td => td.dueDate === t && !td.done).length;
   const streak = calculateStreak();
 
@@ -852,8 +877,6 @@ function renderCalendar() {
   const daysInMonth = new Date(yr, mo+1, 0).getDate();
   const daysInPrev  = new Date(yr, mo, 0).getDate();
 
-  const itemsByDate = collectCalendarItemsByDate();
-
   let html = "", cellCount = 0;
 
   for (let i = startOffset - 1; i >= 0; i--) {
@@ -865,7 +888,7 @@ function renderCalendar() {
     const dateStr = `${yr}-${String(mo+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
     const isToday = dateStr === today();
     const isSelected = dateStr === state.selectedDate;
-    const dayItems = itemsByDate[dateStr] || [];
+    const dayItems = getCalendarItemsForDate(dateStr);
     const classes = ["cal-day", isToday?"today":"", isSelected?"selected":""].filter(Boolean).join(" ");
 
     const dots = dayItems.slice(0,3).map(item =>
@@ -901,14 +924,12 @@ function renderWeekStrip() {
   const mon = new Date(sel);
   mon.setDate(sel.getDate() - dow);
 
-  const itemsByDate = collectCalendarItemsByDate();
-
   let html = "";
   for (let i = 0; i < 7; i++) {
     const d = new Date(mon); d.setDate(mon.getDate() + i);
     const ds = toDateString(d);
     const isT = ds === today(), isSel = ds === state.selectedDate;
-    const dayItems = itemsByDate[ds] || [];
+    const dayItems = getCalendarItemsForDate(ds);
     const dots = dayItems.slice(0,3).map(item =>
       `<span class="event-dot ${item._type === 'workout' ? 'workout-dot' : ''}" style="background:${calColor(item.calendarId)}"></span>`
     ).join("");
@@ -951,7 +972,7 @@ function renderDayEvents() {
   const sd = state.selectedDate;
   title.textContent = sd === today() ? "Heute" : formatDate(sd);
 
-  let dayEvents = Object.entries(state.events).filter(([, e]) => e.date === sd);
+  let dayEvents = Object.entries(state.events).filter(([, e]) => eventOccursOnDate(e, sd));
   if (state.calFilter !== "all") dayEvents = dayEvents.filter(([, e]) => e.calendarId === state.calFilter);
   dayEvents.sort(([, a], [, b]) => (a.time || "").localeCompare(b.time || ""));
 
@@ -966,11 +987,12 @@ function renderDayEvents() {
   const eventsHtml = dayEvents.map(([id, e]) => {
     const color = calColor(e.calendarId);
     const calName = e.calendarId ? state.calendars[e.calendarId]?.name : null;
+    const recurrenceIcon = (e.recurrence && e.recurrence !== "none") ? " 🔁" : "";
     return `
     <li class="event-item" style="--event-color:${color}" data-edit-event="${id}">
       <span class="event-time">${e.time || "–"}</span>
       <div class="event-info">
-        <div class="event-title-text">${escHtml(e.title)}</div>
+        <div class="event-title-text">${escHtml(e.title)}${recurrenceIcon}</div>
         ${e.description ? `<div class="event-desc-text">${escHtml(e.description)}</div>` : ""}
         ${calName ? `<span class="event-cal-badge" style="margin-top:4px;display:inline-block">${escHtml(calName)}${(e.reminderMinutes !== undefined && e.reminderMinutes !== null) ? " · 🔔" : ""}</span>` : ""}
       </div>
@@ -1014,9 +1036,11 @@ function renderDayEvents() {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const ev = state.events[btn.dataset.id];
+      const isRecurring = ev?.recurrence && ev.recurrence !== "none";
+      const seriesNote = isRecurring ? " Da er sich wiederholt, wird die gesamte Serie gelöscht." : "";
       confirmDelete({
         title: "Termin löschen?",
-        text: ev?.title ? `"${ev.title}" wird endgültig gelöscht.` : "Dieser Termin wird endgültig gelöscht.",
+        text: (ev?.title ? `"${ev.title}" wird endgültig gelöscht.` : "Dieser Termin wird endgültig gelöscht.") + seriesNote,
         onConfirm: () => {
           const li = btn.closest("li");
           animateRemoval(li, () => deleteEvent(btn.dataset.id));
@@ -2540,6 +2564,7 @@ function openEventModal(event, eventId) {
   document.getElementById("event-date").value = event?.date || state.selectedDate || today();
   document.getElementById("event-time").value = event?.time || "";
   document.getElementById("event-desc").value = event?.description || "";
+  document.getElementById("event-recurrence").value = event?.recurrence || "none";
   document.getElementById("event-reminder").value = (event?.reminderMinutes !== undefined && event?.reminderMinutes !== null) ? String(event.reminderMinutes) : "15";
   if (event?.calendarId) document.getElementById("event-calendar").value = event.calendarId;
 
@@ -2556,13 +2581,14 @@ document.getElementById("save-event-btn").addEventListener("click", async () => 
   const date = document.getElementById("event-date").value;
   const time = document.getElementById("event-time").value;
   const desc = document.getElementById("event-desc").value.trim();
+  const recurrence = document.getElementById("event-recurrence").value;
   const reminderRaw = document.getElementById("event-reminder").value;
   const reminderMinutes = reminderRaw === "" ? null : Number(reminderRaw);
   if (!title) { showToast("Bitte Titel eingeben"); shakeModal("modal-event"); return; }
   if (!date)  { showToast("Bitte Datum wählen"); shakeModal("modal-event"); return; }
   if (!calendarId) { showToast("Bitte Kalender wählen"); shakeModal("modal-event"); return; }
 
-  const payload = { title, date, time, description: desc, calendarId, reminderMinutes };
+  const payload = { title, date, time, description: desc, calendarId, recurrence, reminderMinutes };
 
   if (editingEventId) {
     await updateEvent(editingEventId, payload);

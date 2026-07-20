@@ -100,6 +100,37 @@ function startReminderLoop() {
 }
 
 /** Holt einmalig Events + To-Dos des aktuell angemeldeten Nutzers via REST und prüft auf fällige Erinnerungen */
+/** Anzahl Tage zwischen zwei "YYYY-MM-DD"-Daten (b - a) */
+function daysBetweenDates(dateStrA, dateStrB) {
+  const a = new Date(dateStrA + "T00:00:00");
+  const b = new Date(dateStrB + "T00:00:00");
+  return Math.round((b - a) / (1000 * 60 * 60 * 24));
+}
+
+/** Punkt 1: Prüft, ob ein (ggf. wiederkehrender) Termin an einem bestimmten Datum stattfindet */
+function eventOccursOnDate(ev, dateStr) {
+  if (!ev.date) return false;
+  if (dateStr < ev.date) return false;
+  if (!ev.recurrence || ev.recurrence === "none") return ev.date === dateStr;
+  const daysDiff = daysBetweenDates(ev.date, dateStr);
+  switch (ev.recurrence) {
+    case "daily":      return true;
+    case "every2days": return daysDiff % 2 === 0;
+    case "weekly":     return daysDiff % 7 === 0;
+    case "yearly": {
+      const anchor = new Date(ev.date + "T00:00:00");
+      const d = new Date(dateStr + "T00:00:00");
+      return anchor.getMonth() === d.getMonth() && anchor.getDate() === d.getDate();
+    }
+    default: return ev.date === dateStr;
+  }
+}
+
+function todayDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 async function checkReminders() {
   try {
     const uid = await getStoredUid();
@@ -113,14 +144,16 @@ async function checkReminders() {
     const todos  = (await todosRes.json()) || {};
 
     const now = Date.now();
+    const t = todayDateStr();
     const notified = await getNotifiedIds();
 
-    // Events prüfen
+    // Events prüfen (Punkt 1: inkl. Wiederholungen — Prüfung erfolgt gegen "heute", nicht nur den Ankertag)
     for (const [id, ev] of Object.entries(events)) {
-      if (!ev.date || ev.reminderMinutes === undefined || ev.reminderMinutes === null) continue;
-      const fireTime = computeFireTime(ev.date, ev.time, ev.reminderMinutes);
+      if (ev.reminderMinutes === undefined || ev.reminderMinutes === null) continue;
+      if (!eventOccursOnDate(ev, t)) continue;
+      const fireTime = computeFireTime(t, ev.time, ev.reminderMinutes);
       if (fireTime === null) continue;
-      const key = `${uid}:event:${id}`;
+      const key = `${uid}:event:${id}:${t}`; // Datum im Schlüssel → jede Wiederholung kann einzeln benachrichtigen
       if (now >= fireTime && now < fireTime + 5 * 60 * 1000 && !notified.has(key)) {
         await showAppNotification(
           `🗓️ ${ev.title}`,

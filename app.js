@@ -318,6 +318,67 @@ function hexToRgb(hex) {
   return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
 }
 
+/** Punkt 2: HSL → Hex, für die Spektrum-Farbwahl (feste Sättigung/Helligkeit, variabler Farbton) */
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const toHex = x => Math.round(255 * x).toString(16).padStart(2, "0");
+  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
+}
+
+/** Ungefährer Farbton (0-360) aus einem Hex-Wert, um den Regler beim Öffnen sinnvoll zu positionieren */
+function hexToHue(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const rf = r / 255, gf = g / 255, bf = b / 255;
+  const max = Math.max(rf, gf, bf), min = Math.min(rf, gf, bf);
+  let h = 0;
+  if (max !== min) {
+    const d = max - min;
+    if (max === rf) h = ((gf - bf) / d + (gf < bf ? 6 : 0));
+    else if (max === gf) h = (bf - rf) / d + 2;
+    else h = (rf - gf) / d + 4;
+    h *= 60;
+  }
+  return Math.round(h);
+}
+
+/**
+ * Punkt 2: Verkabelt eine Spektrum-Leiste (Tippen/Ziehen wählt eine Farbe aus dem vollen Farbkreis).
+ * onChange(hex, isFinal) wird während des Ziehens live (isFinal=false) und am Ende final (isFinal=true) aufgerufen.
+ */
+function setupSpectrumPicker(trackId, handleId, initialHue, onChange) {
+  const track = document.getElementById(trackId);
+  const handle = document.getElementById(handleId);
+  let dragging = false;
+
+  function setHandleForHue(hue) {
+    const ratio = hue / 360;
+    handle.style.left = `${ratio * 100}%`;
+    handle.style.background = hslToHex(hue, 75, 55);
+  }
+  setHandleForHue(initialHue);
+
+  function updateFromClientX(clientX) {
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const hue = Math.round(ratio * 360);
+    const hex = hslToHex(hue, 75, 55);
+    handle.style.left = `${ratio * 100}%`;
+    handle.style.background = hex;
+    return hex;
+  }
+
+  track.addEventListener("touchstart", (e) => { dragging = true; onChange(updateFromClientX(e.touches[0].clientX), false); }, { passive: true });
+  track.addEventListener("touchmove", (e) => { if (dragging) onChange(updateFromClientX(e.touches[0].clientX), false); }, { passive: true });
+  track.addEventListener("touchend", (e) => { if (dragging) { dragging = false; onChange(updateFromClientX(e.changedTouches[0].clientX), true); } }, { passive: true });
+
+  track.addEventListener("mousedown", (e) => { dragging = true; onChange(updateFromClientX(e.clientX), false); });
+  window.addEventListener("mousemove", (e) => { if (dragging) onChange(updateFromClientX(e.clientX), false); });
+  window.addEventListener("mouseup", (e) => { if (dragging) { dragging = false; onChange(updateFromClientX(e.clientX), true); } });
+}
+
 function lightenColor(hex, amount) {
   const { r, g, b } = hexToRgb(hex);
   const nr = Math.round(r + (255 - r) * amount);
@@ -2648,6 +2709,10 @@ document.getElementById("color-picker").addEventListener("click", e => {
   dot.classList.add("selected");
   state.selectedProjectColor = dot.dataset.color;
 });
+setupSpectrumPicker("project-spectrum-track", "project-spectrum-handle", hexToHue("#6C63FF"), (hex) => {
+  document.querySelectorAll("#color-picker .color-dot").forEach(d => d.classList.remove("selected"));
+  state.selectedProjectColor = hex;
+});
 document.getElementById("cancel-project-btn").addEventListener("click", () => closeModal("modal-project"));
 document.getElementById("save-project-btn").addEventListener("click", async () => {
   const name = document.getElementById("project-name").value.trim();
@@ -2667,6 +2732,10 @@ document.getElementById("cal-color-picker").addEventListener("click", e => {
   document.querySelectorAll("#cal-color-picker .color-dot").forEach(d => d.classList.remove("selected"));
   dot.classList.add("selected");
   state.selectedCalendarColor = dot.dataset.color;
+});
+setupSpectrumPicker("cal-spectrum-track", "cal-spectrum-handle", hexToHue("#6C63FF"), (hex) => {
+  document.querySelectorAll("#cal-color-picker .color-dot").forEach(d => d.classList.remove("selected"));
+  state.selectedCalendarColor = hex;
 });
 document.getElementById("cancel-calendar-btn").addEventListener("click", () => closeModal("modal-calendar"));
 document.getElementById("save-calendar-btn").addEventListener("click", async () => {
@@ -2693,6 +2762,16 @@ document.getElementById("accent-color-picker").addEventListener("click", async (
     await update(REFS.settings(), { accentColor: hex });
   } catch (err) {
     showToast("Fehler beim Speichern: " + err.message);
+  }
+});
+setupSpectrumPicker("accent-spectrum-track", "accent-spectrum-handle", hexToHue("#6C63FF"), async (hex, isFinal) => {
+  applyAccentColor(hex); // während des Ziehens sofort live anwenden
+  if (isFinal) {
+    try {
+      await update(REFS.settings(), { accentColor: hex });
+    } catch (err) {
+      showToast("Fehler beim Speichern: " + err.message);
+    }
   }
 });
 

@@ -1363,10 +1363,9 @@ function qualityColor(q) {
 
 /** Zählt, wie viele Aktivitätsarten (Training/Check-in/erledigte Aufgabe) an einem Tag stattfanden (0-3) */
 function computeDayActivityLevel(dateStr) {
-  let count = 0;
-  if (toArray(state.workouts).some(w => w.date === dateStr)) count++;
-  if (toArray(state.todos).some(td => td.completedAt && toDateString(new Date(td.completedAt)) === dateStr)) count++;
-  return count;
+  const workoutCount = toArray(state.workouts).filter(w => w.date === dateStr).length;
+  const todoCount = toArray(state.todos).filter(td => td.completedAt && toDateString(new Date(td.completedAt)) === dateStr).length;
+  return workoutCount + todoCount;
 }
 
 /** Rendert die 5-Wochen-Aktivitäts-Heatmap im Training-Tab (Redesign, an Bild 1 angelehnt) */

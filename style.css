@@ -1133,6 +1133,34 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
    ═══════════════════════════════════════════ */
 
 /* Aktivitäts-Heatmap-Karte (Redesign) */
+/* .fit-Upload-Button (Garmin-Import) */
+.fit-upload-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, var(--bg-2)) 0%, var(--bg-2) 70%);
+  border: 1px solid var(--accent-mid);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: transform var(--transition-fast);
+  text-align: left;
+}
+.fit-upload-btn:active { transform: scale(0.98); }
+.fit-upload-icon {
+  font-size: 22px;
+  width: 44px; height: 44px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--accent-dim);
+}
+.fit-upload-title { display: block; font-size: var(--text-base); font-weight: 700; color: var(--text-0); }
+.fit-upload-sub { display: block; font-size: var(--text-xs); color: var(--text-2); margin-top: 2px; }
+
 .heatmap-card {
   background: var(--bg-2);
   border: 1px solid var(--border);

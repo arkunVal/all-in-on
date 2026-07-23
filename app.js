@@ -2402,7 +2402,7 @@ function openWorkoutModal(workout, workoutId) {
   }
 
   state.editingWorkoutId = workoutId || null;
-  document.getElementById("workout-modal-title").textContent = workout ? "Training bearbeiten" : "Training erfassen";
+  document.getElementById("workout-modal-title").textContent = workoutId ? "Training bearbeiten" : "Training erfassen";
 
   selectedOtherType = workout?.otherType || "hit";
   setSelectedSport(workout?.sport || "swim");
@@ -2431,6 +2431,99 @@ function openWorkoutModal(workout, workoutId) {
 }
 
 document.getElementById("add-workout-btn").addEventListener("click", () => openWorkoutModal(null, null));
+
+// ═══════════════════════════════════════════════════════
+// 14f. .FIT-IMPORT (Garmin) — halbautomatisierte Trainingserfassung
+// ═══════════════════════════════════════════════════════
+
+/** Lädt das offizielle Garmin-FIT-SDK erst bei Bedarf (per ESM-CDN, kein Build-Schritt nötig) */
+let _fitSdkPromise = null;
+function loadFitSdk() {
+  if (!_fitSdkPromise) {
+    _fitSdkPromise = import("https://cdn.jsdelivr.net/npm/@garmin/fitsdk/+esm");
+  }
+  return _fitSdkPromise;
+}
+
+/** Ordnet den FIT-Sportart-String einer unserer vier Trainingsarten zu (bestmöglich) */
+function mapFitSportToAppSport(sportRaw) {
+  const s = (sportRaw || "").toLowerCase();
+  if (s.includes("run")) return "run";
+  if (s.includes("cycl") || s.includes("bik")) return "bike";
+  if (s.includes("swim")) return "swim";
+  return "other";
+}
+
+async function handleFitFileUpload(file) {
+  showToast("FIT-Datei wird gelesen …");
+  try {
+    const { Decoder, Stream } = await loadFitSdk();
+    const arrayBuffer = await file.arrayBuffer();
+    const stream = Stream.fromArrayBuffer(arrayBuffer);
+
+    if (!Decoder.isFIT(stream)) {
+      showToast("Das ist keine gültige .fit-Datei");
+      return;
+    }
+
+    const decoder = new Decoder(stream);
+    const { messages, errors } = decoder.read();
+    if (errors && errors.length) console.warn("FIT-Parsing-Hinweise:", errors);
+
+    const session = messages.sessionMesgs?.[0];
+    if (!session) {
+      showToast("Keine Trainingszusammenfassung in dieser Datei gefunden");
+      return;
+    }
+
+    const sport = mapFitSportToAppSport(session.sport);
+    const sportLabels = { swim: "Schwimmen", bike: "Radfahren", run: "Laufen", other: "Training" };
+
+    const totalSeconds = Math.round(session.totalTimerTime ?? session.totalElapsedTime ?? 0);
+    const durationHours = Math.floor(totalSeconds / 3600);
+    const durationMinutes = Math.floor((totalSeconds % 3600) / 60);
+    const durationSeconds = totalSeconds % 60;
+
+    let distance = null;
+    if (session.totalDistance !== undefined && session.totalDistance !== null) {
+      distance = sport === "swim"
+        ? Math.round(session.totalDistance)
+        : Math.round((session.totalDistance / 1000) * 100) / 100;
+    }
+
+    const date = session.startTime instanceof Date ? toDateString(session.startTime) : today();
+
+    const prefilled = {
+      sport,
+      otherType: sport === "other" ? "athletics" : null,
+      title: sportLabels[sport],
+      date,
+      durationHours, durationMinutes, durationSeconds,
+      distance,
+      avgHr: session.avgHeartRate ?? null,
+      load: null,
+      focusAerobic: 0,
+      focusAnaerobic: 0,
+      zones: []
+    };
+
+    // Halbautomatisiert: Formular wird vorbefüllt geöffnet, gespeichert wird erst nach manueller Prüfung/Ergänzung
+    openWorkoutModal(prefilled, null);
+    showToast("Daten übernommen ✓ Bitte prüfen & ergänzen");
+  } catch (e) {
+    console.error(e);
+    showToast("Fehler beim Lesen der .fit-Datei: " + e.message);
+  }
+}
+
+document.getElementById("fit-upload-btn").addEventListener("click", () => {
+  document.getElementById("fit-file-input").click();
+});
+document.getElementById("fit-file-input").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (file) handleFitFileUpload(file);
+  e.target.value = ""; // erlaubt erneutes Auswählen derselben Datei
+});
 document.getElementById("cancel-workout-btn").addEventListener("click", () => closeModal("modal-workout"));
 
 document.getElementById("save-workout-btn").addEventListener("click", async () => {

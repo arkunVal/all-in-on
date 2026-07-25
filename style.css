@@ -1656,6 +1656,88 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
   color: var(--text-0);
 }
 
+/* ═══════════════════════════════════════════
+   PUNKT 2: SOCIAL-MEDIA-SHARE-KARTE
+   ═══════════════════════════════════════════ */
+
+.share-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  padding: var(--space-xl) var(--space-lg);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 24%, var(--bg-1)) 0%, var(--bg-0) 75%);
+  border: 1px solid var(--accent-mid);
+  box-shadow: var(--shadow-float);
+  margin-bottom: var(--space-lg);
+}
+.share-card-glow {
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-glow) 0%, rgba(108,99,255,0) 70%);
+  pointer-events: none;
+}
+.share-card-header {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: var(--space-md);
+}
+.share-card-icon { font-size: 20px; }
+.share-card-app-name {
+  font-size: var(--text-sm); font-weight: 700;
+  color: var(--text-1); letter-spacing: 0.3px;
+}
+.share-card-range {
+  position: relative; z-index: 1;
+  font-size: var(--text-lg);
+  font-weight: 800;
+  color: var(--text-0);
+  letter-spacing: -0.4px;
+  margin-bottom: var(--space-lg);
+}
+.share-stat-grid {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+.share-stat {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+}
+.share-stat-hero {
+  grid-column: span 2;
+  text-align: center;
+  padding: var(--space-lg) var(--space-md);
+}
+.share-stat-hero .share-stat-value { font-size: var(--text-3xl); }
+.share-stat-icon { font-size: 22px; margin-bottom: 6px; display: block; }
+.share-stat-value {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  color: var(--text-0);
+  letter-spacing: -0.6px;
+  line-height: 1.1;
+}
+.share-stat-label {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text-2);
+  margin-top: 4px;
+}
+.share-card-footer {
+  position: relative; z-index: 1;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: 0.4px;
+}
+
 /* Kalender-Punkte für Workouts unterscheiden sich optisch leicht (Ring statt voller Punkt) */
 .event-dot.workout-dot {
   border: 1.5px solid var(--bg-2);

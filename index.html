@@ -604,7 +604,9 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
         <h2 class="modal-title inline">Wochenrückblick</h2>
-        <div style="width:36px"></div>
+        <button class="icon-btn" id="share-summary-btn" aria-label="Für Social Media">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        </button>
       </div>
 
       <div class="week-nav">
@@ -633,6 +635,28 @@
       </div>
       <div class="stat-card full-width" id="weekly-todo-count-card" style="margin-bottom: var(--space-md)"></div>
       <ul class="todo-list" id="weekly-completed-todos"></ul>
+    </div>
+  </div>
+
+  <!-- Modal: Social-Media-Zusammenfassung (Punkt 2) -->
+  <div id="modal-share-summary" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+
+      <div class="share-card" id="share-card">
+        <div class="share-card-glow"></div>
+        <div class="share-card-header">
+          <span class="share-card-icon">🗓️</span>
+          <span class="share-card-app-name">All-in-One</span>
+        </div>
+        <div class="share-card-range" id="share-range"></div>
+        <div class="share-stat-grid" id="share-stat-grid"></div>
+        <div class="share-card-footer">Erstellt mit All-in-One</div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="close-share-summary-btn" style="width:100%">Schließen</button>
+      </div>
     </div>
   </div>
 

@@ -2257,6 +2257,57 @@ document.getElementById("weekly-review-next").addEventListener("click", () => {
   renderWeeklyReview();
 });
 
+// ═══════════════════════════════════════════════════════
+// 14g. SOCIAL-MEDIA-SHARE-KARTE (Punkt 2)
+// ═══════════════════════════════════════════════════════
+
+/** Baut eine reduzierte, screenshot-taugliche Zusammenfassung der aktuell gewählten Woche */
+function renderShareSummary() {
+  const range = getWeekRange(state.weeklyReviewOffset);
+  document.getElementById("share-range").textContent = range.label;
+
+  const weekWorkouts = toArray(state.workouts).filter(w => w.date >= range.startStr && w.date <= range.endStr);
+
+  let totalMinutes = 0;
+  let totalDistanceKm = 0;
+  weekWorkouts.forEach(w => {
+    totalMinutes += (Number(w.durationHours) || 0) * 60 + (Number(w.durationMinutes) || 0) + (Number(w.durationSeconds) || 0) / 60;
+    if (w.distance !== undefined && w.distance !== null) {
+      totalDistanceKm += w.sport === "swim" ? Number(w.distance) / 1000 : Number(w.distance);
+    }
+  });
+  const totalH = Math.floor(totalMinutes / 60);
+  const totalM = Math.round(totalMinutes % 60);
+
+  const completedCount = toArray(state.todos).filter(td =>
+    td.done && td.completedAt && td.completedAt >= range.startMs && td.completedAt <= range.endMs
+  ).length;
+
+  const streak = calculateStreak();
+
+  const stats = [
+    { icon: "⏱️", value: totalMinutes > 0 ? `${totalH}h ${totalM}min` : "0h", label: "Trainingszeit" },
+    { icon: "🏋️", value: String(weekWorkouts.length), label: "Trainings" },
+    { icon: "📏", value: totalDistanceKm > 0 ? `${totalDistanceKm.toFixed(1)} km` : "–", label: "Distanz" },
+    { icon: "🔥", value: String(streak), label: "Tage-Streak" },
+    { icon: "✅", value: String(completedCount), label: "Erledigt" },
+  ];
+
+  document.getElementById("share-stat-grid").innerHTML = stats.map((s, i) => `
+    <div class="share-stat ${i === 0 ? "share-stat-hero" : ""}">
+      <span class="share-stat-icon">${s.icon}</span>
+      <div class="share-stat-value">${s.value}</div>
+      <div class="share-stat-label">${s.label}</div>
+    </div>
+  `).join("");
+}
+
+document.getElementById("share-summary-btn").addEventListener("click", () => {
+  renderShareSummary();
+  openModal("modal-share-summary");
+});
+document.getElementById("close-share-summary-btn").addEventListener("click", () => closeModal("modal-share-summary"));
+
 function populateWorkoutCalendarSelect() {
   const sel = document.getElementById("workout-calendar");
   if (!sel) return;
@@ -2493,6 +2544,15 @@ async function handleFitFileUpload(file) {
 
     const date = session.startTime instanceof Date ? toDateString(session.startTime) : today();
 
+    // Punkt 1: Aerob/Anaerob direkt aus Garmins Firstbeat-Trainingseffekt übernehmen (identische 0.0-5.0-Skala)
+    const clampEffect = (v) => Math.max(0, Math.min(5, Math.round((v ?? 0) * 10) / 10));
+    const focusAerobic = session.totalTrainingEffect !== undefined ? clampEffect(session.totalTrainingEffect) : 0;
+    const focusAnaerobic = session.totalAnaerobicEffect !== undefined ? clampEffect(session.totalAnaerobicEffect) : 0;
+
+    // Belastungswert: kein einheitliches FIT-Standardfeld verfügbar — verbrannte Kalorien sind der
+    // universellste vorhandene Näherungswert für die Trainingsbelastung und werden als Startwert übernommen.
+    const load = (session.totalCalories !== undefined && session.totalCalories !== null) ? Math.round(session.totalCalories) : null;
+
     const prefilled = {
       sport,
       otherType: sport === "other" ? "athletics" : null,
@@ -2501,9 +2561,9 @@ async function handleFitFileUpload(file) {
       durationHours, durationMinutes, durationSeconds,
       distance,
       avgHr: session.avgHeartRate ?? null,
-      load: null,
-      focusAerobic: 0,
-      focusAnaerobic: 0,
+      load,
+      focusAerobic,
+      focusAnaerobic,
       zones: []
     };
 

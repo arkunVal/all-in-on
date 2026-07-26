@@ -2547,7 +2547,7 @@ async function handleFitFileUpload(file) {
     // Punkt 1: Aerob/Anaerob direkt aus Garmins Firstbeat-Trainingseffekt übernehmen (identische 0.0-5.0-Skala)
     const clampEffect = (v) => Math.max(0, Math.min(5, Math.round((v ?? 0) * 10) / 10));
     const focusAerobic = session.totalTrainingEffect !== undefined ? clampEffect(session.totalTrainingEffect) : 0;
-    const focusAnaerobic = session.totalAnaerobicEffect !== undefined ? clampEffect(session.totalAnaerobicEffect) : 0;
+    const focusAnaerobic = session.totalAnaerobicTrainingEffect !== undefined ? clampEffect(session.totalAnaerobicTrainingEffect) : 0;
 
     // Belastungswert: kein einheitliches FIT-Standardfeld verfügbar — verbrannte Kalorien sind der
     // universellste vorhandene Näherungswert für die Trainingsbelastung und werden als Startwert übernommen.

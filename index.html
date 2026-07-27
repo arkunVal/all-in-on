@@ -236,6 +236,56 @@
 
       </section>
 
+      <!-- ===== VIEW: NUTRITION ===== -->
+      <section id="view-nutrition" class="view">
+        
+        <!-- Datum-Navigation -->
+        <div class="nutrition-header">
+          <button id="nutrition-prev-day" class="icon-btn" aria-label="Vorheriger Tag">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div class="nutrition-date" id="nutrition-date">Heute</div>
+          <button id="nutrition-next-day" class="icon-btn" aria-label="Nächster Tag">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+
+        <!-- Zusammenfassung Heute -->
+        <div id="nutrition-summary-today"></div>
+
+        <!-- Heutige Einträge -->
+        <div class="nutrition-section">
+          <h3>Meine Mahlzeiten</h3>
+          <ul id="nutrition-entries-today" class="nutrition-entries-list">
+            <li class="empty-state">Keine Einträge für heute.</li>
+          </ul>
+        </div>
+
+        <!-- Produkte & Mahlzeiten Management -->
+        <div class="nutrition-section">
+          <h3>Produkte</h3>
+          <div class="nutrition-tabs">
+            <button class="tab-btn active" data-tab="products">Produkte</button>
+            <button class="tab-btn" data-tab="meals">Mahlzeiten</button>
+          </div>
+
+          <div class="tab-content active" id="tab-products">
+            <button class="btn btn-primary" id="nutrition-add-product-btn" style="width: 100%; margin-bottom: 1rem;">+ Neues Produkt</button>
+            <div id="nutrition-products-list" class="nutrition-products-list">
+              <p class="empty-state">Keine Produkte vorhanden.</p>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-meals">
+            <button class="btn btn-primary" id="nutrition-add-meal-btn" style="width: 100%; margin-bottom: 1rem;">+ Neue Mahlzeit</button>
+            <div id="nutrition-meals-list" class="nutrition-meals-list">
+              <p class="empty-state">Keine Mahlzeiten vorhanden.</p>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
     </main>
 
     <!-- BOTTOM NAVIGATION -->
@@ -273,6 +323,13 @@
           <path d="M16.5 7.5l1-1 4 4-1 1z"/><path d="M6.5 16.5l-1 1-4-4 1-1z"/>
         </svg>
         <span class="nav-label">Training</span>
+      </button>
+      <button class="nav-item" data-view="nutrition" aria-label="Ernährung">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+          <line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+        </svg>
+        <span class="nav-label">Ernährung</span>
       </button>
     </nav>
   </div>
@@ -989,6 +1046,99 @@
 
       <div class="modal-actions">
         <button class="btn btn-primary" id="briefing-close-btn" style="width:100%">Los geht's</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Produkt erstellen/bearbeiten -->
+  <div id="modal-product" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Produkt erstellen</h2>
+      <div class="form-group">
+        <label class="form-label" for="product-name-input">Name</label>
+        <input class="form-input" id="product-name-input" type="text" placeholder="z.B. Hähnchenbrust, Reis…" autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="product-serving-input">Portionsgröße (g)</label>
+        <input class="form-input" id="product-serving-input" type="number" placeholder="100" value="100" min="1" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="product-calories-input">Kalorien (kcal)</label>
+          <input class="form-input" id="product-calories-input" type="number" placeholder="0" min="0" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="product-protein-input">Protein (g)</label>
+          <input class="form-input" id="product-protein-input" type="number" placeholder="0" min="0" step="0.1" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="product-carbs-input">Kohlenhydrate (g)</label>
+          <input class="form-input" id="product-carbs-input" type="number" placeholder="0" min="0" step="0.1" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="product-fat-input">Fett (g)</label>
+          <input class="form-input" id="product-fat-input" type="number" placeholder="0" min="0" step="0.1" />
+        </div>
+      </div>
+      <p class="form-hint">Alle Werte beziehen sich auf die angegebene Portionsgröße.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancel-product-btn">Abbrechen</button>
+        <button class="btn btn-primary" id="save-product-btn">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Mahlzeit/Gericht erstellen -->
+  <div id="modal-meal" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Mahlzeit erstellen</h2>
+      <div class="form-group">
+        <label class="form-label" for="meal-name-input">Name der Mahlzeit</label>
+        <input class="form-input" id="meal-name-input" type="text" placeholder="z.B. Frühstücksbowl, Mittagessen…" autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ausgewählte Produkte</label>
+        <div id="meal-products-selected" class="meal-products-selected"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="meal-product-search">Produkt hinzufügen</label>
+        <input class="form-input" id="meal-product-search" type="text" placeholder="Produkt suchen…" autocomplete="off" />
+        <div id="meal-product-search-results" class="meal-product-search-results"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancel-meal-btn">Abbrechen</button>
+        <button class="btn btn-primary" id="save-meal-btn">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Mahlzeit/Produkt loggen -->
+  <div id="modal-nutrition-log" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Eintrag hinzufügen</h2>
+      <div class="form-group">
+        <label class="form-label" for="nutrition-log-type">Typ</label>
+        <select class="form-input form-select" id="nutrition-log-type">
+          <option value="product">Produkt</option>
+          <option value="meal">Mahlzeit</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="nutrition-log-item">Auswahl</label>
+        <select class="form-input form-select" id="nutrition-log-item"></select>
+      </div>
+      <div class="form-group" id="nutrition-log-amount-group">
+        <label class="form-label" for="nutrition-log-amount">Menge (g)</label>
+        <input class="form-input" id="nutrition-log-amount" type="number" placeholder="100" min="1" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancel-nutrition-log-btn">Abbrechen</button>
+        <button class="btn btn-primary" id="save-nutrition-log-btn">Hinzufügen</button>
       </div>
     </div>
   </div>

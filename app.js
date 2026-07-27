@@ -53,7 +53,14 @@ const REFS = {
   workouts:  () => ref(db, `users/${currentUid}/workouts`),
   workout:   (id) => ref(db, `users/${currentUid}/workouts/${id}`),
   profile:   () => ref(db, `users/${currentUid}/profile`),
-  settings:  () => ref(db, `users/${currentUid}/settings`)
+  settings:  () => ref(db, `users/${currentUid}/settings`),
+  // Nutrition & Kalorien-Tracking
+  products:  () => ref(db, `users/${currentUid}/products`),
+  product:   (id) => ref(db, `users/${currentUid}/products/${id}`),
+  meals:     () => ref(db, `users/${currentUid}/meals`),
+  meal:      (id) => ref(db, `users/${currentUid}/meals/${id}`),
+  nutrition: (dateStr) => ref(db, `users/${currentUid}/nutrition/${dateStr}`),
+  nutritionDay: () => ref(db, `users/${currentUid}/nutrition`)
 };
 
 // ═══════════════════════════════════════════════════════
@@ -124,7 +131,14 @@ const state = {
   weeklyReviewOffset:    0, // 0 = aktuelle Woche, -1 = letzte Woche, etc.
   profile:               {},
   selectedMainSports:    new Set(),
-  settings:              {}
+  settings:              {},
+  // Nutrition & Kalorien-Tracking
+  products:              {},  // { id: { name, calories, protein, carbs, fat, servingSize } }
+  meals:                 {},  // { id: { name, items: [ { productId, amount } ] } }
+  nutritionEntries:      {},  // { "YYYY-MM-DD": [ { id, type: 'product'|'meal', itemId, amount, timestamp } ] }
+  nutritionGoals:        { calories: 2000, protein: 150, carbs: 250, fat: 65 },
+  editingProductId:      null,
+  editingMealId:         null
 };
 
 // ═══════════════════════════════════════════════════════
@@ -660,6 +674,11 @@ function resetAppState() {
   state.openTodoIds = new Set();
   state.openInjuryIds = new Set();
   state.openWorkoutIds = new Set();
+  state.products = {};
+  state.meals = {};
+  state.nutritionEntries = {};
+  state.editingProductId = null;
+  state.editingMealId = null;
 
   renderCalendar();
   renderWeekStrip();
@@ -676,6 +695,10 @@ function resetAppState() {
   renderWorkoutList();
   renderDashboardHero();
   renderActivityHeatmap();
+  renderNutritionProducts();
+  renderNutritionMeals();
+  renderNutritionToday();
+  renderNutritionDateLabel();
 }
 
 function initListeners() {
@@ -762,6 +785,27 @@ function initListeners() {
     renderDashboardHero();
     renderActivityHeatmap();
   });
+
+  onValue(REFS.products(), snap => {
+    state.products = snap.exists() ? snap.val() : {};
+    renderNutritionProducts();
+    renderMealProductSelector();
+    updateNutritionLogItems();
+    renderNutritionToday();
+  });
+
+  onValue(REFS.meals(), snap => {
+    state.meals = snap.exists() ? snap.val() : {};
+    renderNutritionMeals();
+    updateNutritionLogItems();
+    renderNutritionToday();
+  });
+
+  onValue(REFS.nutritionDay(), snap => {
+    const data = snap.exists() ? snap.val() : {};
+    state.nutritionEntries = data || {};
+    renderNutritionToday();
+  });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -784,7 +828,7 @@ function navigate(viewName, direction) {
   document.querySelectorAll(".nav-item").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.view === viewName);
   });
-  const titles = { calendar:"Kalender", projects:"Projekte", todos:"To-Dos", notes:"Notizen", training:"Training" };
+  const titles = { calendar:"Kalender", projects:"Projekte", todos:"To-Dos", notes:"Notizen", training:"Training", nutrition:"Ernährung" };
   document.getElementById("header-title").textContent = titles[viewName] || "";
   renderHeaderActions();
 }
@@ -2740,6 +2784,13 @@ document.getElementById("header-action-btn").addEventListener("click", () => {
     return;
   }
 
+  if (state.currentView === "nutrition") {
+    clearNutritionLogInputs();
+    updateNutritionLogItems();
+    openModal("modal-nutrition-log");
+    return;
+  }
+
   const modalMap = { calendar:"modal-event", projects:"modal-project", todos:"modal-todo", notes:"modal-note" };
   const m = modalMap[state.currentView];
   if (!m) return;
@@ -3343,13 +3394,544 @@ function notifyServiceWorkerOfUid(uid) {
 }
 
 // ═══════════════════════════════════════════════════════
+// 28. NUTRITION & KALORIEN-TRACKING
+// ═══════════════════════════════════════════════════════
+
+// ── PRODUKTE VERWALTEN ──
+
+async function createProduct() {
+  const name = document.getElementById("product-name-input").value.trim();
+  const calories = Number(document.getElementById("product-calories-input").value) || 0;
+  const protein = Number(document.getElementById("product-protein-input").value) || 0;
+  const carbs = Number(document.getElementById("product-carbs-input").value) || 0;
+  const fat = Number(document.getElementById("product-fat-input").value) || 0;
+  const serving = Number(document.getElementById("product-serving-input").value) || 100;
+
+  if (!name) {
+    shakeModal("modal-product");
+    return;
+  }
+
+  if (state.editingProductId) {
+    await set(REFS.product(state.editingProductId), { name, calories, protein, carbs, fat, serving });
+    state.editingProductId = null;
+    showToast("Produkt aktualisiert ✓");
+  } else {
+    const newRef = push(REFS.products());
+    await set(newRef, { name, calories, protein, carbs, fat, serving });
+    showToast("Produkt erstellt ✓");
+  }
+
+  closeModal("modal-product");
+  clearProductInputs();
+}
+
+function clearProductInputs() {
+  document.getElementById("product-name-input").value = "";
+  document.getElementById("product-calories-input").value = "";
+  document.getElementById("product-protein-input").value = "";
+  document.getElementById("product-carbs-input").value = "";
+  document.getElementById("product-fat-input").value = "";
+  document.getElementById("product-serving-input").value = "100";
+}
+
+async function deleteProduct(id) {
+  confirmDelete({
+    title: "Produkt löschen?",
+    text: "Das Produkt wird nicht mehr verfügbar sein.",
+    onConfirm: async () => {
+      await remove(REFS.product(id));
+      showToast("Produkt gelöscht ✓");
+      renderNutritionProducts();
+    }
+  });
+}
+
+function editProduct(id) {
+  const p = state.products[id];
+  state.editingProductId = id;
+  document.getElementById("product-name-input").value = p.name;
+  document.getElementById("product-calories-input").value = p.calories;
+  document.getElementById("product-protein-input").value = p.protein;
+  document.getElementById("product-carbs-input").value = p.carbs;
+  document.getElementById("product-fat-input").value = p.fat;
+  document.getElementById("product-serving-input").value = p.serving || 100;
+  openModal("modal-product");
+}
+
+function renderNutritionProducts() {
+  const container = document.getElementById("nutrition-products-list");
+  if (!container) return;
+  const products = toArray(state.products);
+  container.innerHTML = products.map(p => `
+    <div class="nutrition-product-item">
+      <div class="nutrition-product-info">
+        <div class="nutrition-product-name">${escHtml(p.name)}</div>
+        <div class="nutrition-product-macros">
+          <span>${p.calories} kcal</span> · 
+          <span>P: ${p.protein}g</span> · 
+          <span>K: ${p.carbs}g</span> · 
+          <span>F: ${p.fat}g</span>
+        </div>
+        <div class="nutrition-product-serving">${p.serving}g pro Portion</div>
+      </div>
+      <div class="nutrition-product-actions">
+        <button class="icon-btn" onclick="editProduct('${p.id}')" aria-label="Bearbeiten">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="icon-btn delete-btn" onclick="deleteProduct('${p.id}')" aria-label="Löschen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+      </div>
+    </div>
+  `).join("");
+
+  if (products.length === 0) {
+    container.innerHTML = '<p class="empty-state">Keine Produkte erstellt. Erstelle dein erstes Produkt!</p>';
+  }
+}
+
+// ── MAHLZEITEN/GERICHTE ──
+
+async function createMeal() {
+  const name = document.getElementById("meal-name-input").value.trim();
+  const selectedProducts = Array.from(document.querySelectorAll("#meal-products-selected .meal-product-item")).map(el => ({
+    productId: el.dataset.productId,
+    amount: Number(el.dataset.amount)
+  }));
+
+  if (!name || selectedProducts.length === 0) {
+    shakeModal("modal-meal");
+    return;
+  }
+
+  if (state.editingMealId) {
+    await set(REFS.meal(state.editingMealId), { name, items: selectedProducts });
+    state.editingMealId = null;
+    showToast("Mahlzeit aktualisiert ✓");
+  } else {
+    const newRef = push(REFS.meals());
+    await set(newRef, { name, items: selectedProducts });
+    showToast("Mahlzeit erstellt ✓");
+  }
+
+  closeModal("modal-meal");
+  clearMealInputs();
+}
+
+function clearMealInputs() {
+  document.getElementById("meal-name-input").value = "";
+  document.getElementById("meal-products-selected").innerHTML = "";
+  document.getElementById("meal-product-search").value = "";
+  renderMealProductSelector();
+}
+
+function renderMealProductSelector() {
+  const container = document.getElementById("meal-product-search-results");
+  if (!container) return;
+  const products = toArray(state.products);
+  container.innerHTML = products.map(p => `
+    <div class="meal-product-selector-item" data-product-id="${p.id}">
+      <div>
+        <div class="font-bold">${escHtml(p.name)}</div>
+        <div class="text-sm text-gray">${p.calories} kcal · ${p.serving}g</div>
+      </div>
+      <button class="btn btn-sm" onclick="addMealProduct('${p.id}', '${escHtml(p.name)}', ${p.calories}, ${p.protein}, ${p.carbs}, ${p.fat}, ${p.serving})">+</button>
+    </div>
+  `).join("");
+}
+
+function addMealProduct(productId, name, calories, protein, carbs, fat, serving) {
+  const container = document.getElementById("meal-products-selected");
+  const amount = prompt(`Menge in Gramm für "${name}" (Standard: ${serving}g)?`, serving);
+  if (!amount || isNaN(amount)) return;
+
+  const numAmount = Number(amount);
+  const multiplier = numAmount / serving;
+  const html = `
+    <div class="meal-product-item" data-product-id="${productId}" data-amount="${numAmount}">
+      <div class="meal-product-item-info">
+        <span>${escHtml(name)}</span>
+        <span class="text-sm text-gray">${numAmount}g</span>
+      </div>
+      <button class="icon-btn delete-btn" onclick="this.parentElement.remove()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </button>
+    </div>
+  `;
+  container.insertAdjacentHTML("beforeend", html);
+}
+
+async function deleteMeal(id) {
+  confirmDelete({
+    title: "Mahlzeit löschen?",
+    text: "Die Mahlzeit wird nicht mehr verfügbar sein.",
+    onConfirm: async () => {
+      await remove(REFS.meal(id));
+      showToast("Mahlzeit gelöscht ✓");
+      renderNutritionMeals();
+    }
+  });
+}
+
+function editMeal(id) {
+  const m = state.meals[id];
+  state.editingMealId = id;
+  document.getElementById("meal-name-input").value = m.name;
+  
+  const container = document.getElementById("meal-products-selected");
+  container.innerHTML = (m.items || []).map(item => {
+    const p = state.products[item.productId];
+    if (!p) return "";
+    return `
+      <div class="meal-product-item" data-product-id="${item.productId}" data-amount="${item.amount}">
+        <div class="meal-product-item-info">
+          <span>${escHtml(p.name)}</span>
+          <span class="text-sm text-gray">${item.amount}g</span>
+        </div>
+        <button class="icon-btn delete-btn" onclick="this.parentElement.remove()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+      </div>
+    `;
+  }).join("");
+  
+  openModal("modal-meal");
+}
+
+function renderNutritionMeals() {
+  const container = document.getElementById("nutrition-meals-list");
+  if (!container) return;
+  const meals = toArray(state.meals);
+  container.innerHTML = meals.map(m => {
+    const totals = computeMealMacros(m);
+    return `
+      <div class="nutrition-meal-item">
+        <div class="nutrition-meal-info">
+          <div class="nutrition-meal-name">${escHtml(m.name)}</div>
+          <div class="nutrition-meal-macros">
+            <span>${totals.calories} kcal</span> · 
+            <span>P: ${totals.protein}g</span> · 
+            <span>K: ${totals.carbs}g</span> · 
+            <span>F: ${totals.fat}g</span>
+          </div>
+          <div class="nutrition-meal-items text-sm text-gray">${(m.items || []).length} Produkte</div>
+        </div>
+        <div class="nutrition-meal-actions">
+          <button class="icon-btn" onclick="editMeal('${m.id}')" aria-label="Bearbeiten">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="icon-btn delete-btn" onclick="deleteMeal('${m.id}')" aria-label="Löschen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  if (meals.length === 0) {
+    container.innerHTML = '<p class="empty-state">Keine Mahlzeiten erstellt. Erstelle deine erste Mahlzeit!</p>';
+  }
+}
+
+function computeMealMacros(meal) {
+  let calories = 0, protein = 0, carbs = 0, fat = 0;
+  (meal.items || []).forEach(item => {
+    const p = state.products[item.productId];
+    if (p) {
+      const mult = item.amount / (p.serving || 100);
+      calories += p.calories * mult;
+      protein += p.protein * mult;
+      carbs += p.carbs * mult;
+      fat += p.fat * mult;
+    }
+  });
+  return {
+    calories: Math.round(calories),
+    protein: Math.round(protein * 10) / 10,
+    carbs: Math.round(carbs * 10) / 10,
+    fat: Math.round(fat * 10) / 10
+  };
+}
+
+// ── TÄGLICHES TRACKING ──
+
+async function logNutritionEntry() {
+  const type = document.getElementById("nutrition-log-type").value;
+  const itemId = document.getElementById("nutrition-log-item").value;
+  const amount = Number(document.getElementById("nutrition-log-amount").value);
+
+  if (!itemId || !amount || amount <= 0) {
+    shakeModal("modal-nutrition-log");
+    return;
+  }
+
+  const dateStr = state.selectedDate;
+  const entries = state.nutritionEntries[dateStr] || [];
+  const newEntry = {
+    type,
+    itemId,
+    amount,
+    timestamp: Date.now(),
+    id: Math.random().toString(36).substr(2, 9)
+  };
+
+  entries.push(newEntry);
+  await set(REFS.nutrition(dateStr), entries);
+  showToast("Eintrag hinzugefügt ✓");
+  closeModal("modal-nutrition-log");
+  clearNutritionLogInputs();
+  renderNutritionToday();
+}
+
+function clearNutritionLogInputs() {
+  document.getElementById("nutrition-log-type").value = "product";
+  document.getElementById("nutrition-log-item").value = "";
+  document.getElementById("nutrition-log-amount").value = "";
+}
+
+async function deleteNutritionEntry(entryId) {
+  const dateStr = state.selectedDate;
+  let entries = state.nutritionEntries[dateStr] || [];
+  entries = entries.filter(e => e.id !== entryId);
+  await set(REFS.nutrition(dateStr), entries.length > 0 ? entries : null);
+  showToast("Eintrag gelöscht ✓");
+  renderNutritionToday();
+}
+
+function updateNutritionLogItems() {
+  const type = document.getElementById("nutrition-log-type").value;
+  const select = document.getElementById("nutrition-log-item");
+  
+  if (type === "product") {
+    const products = toArray(state.products);
+    select.innerHTML = products.map(p => `<option value="${p.id}">${escHtml(p.name)} (${p.serving}g)</option>`).join("");
+  } else {
+    const meals = toArray(state.meals);
+    select.innerHTML = meals.map(m => `<option value="${m.id}">${escHtml(m.name)}</option>`).join("");
+  }
+}
+
+function computeDayMacros(entries) {
+  let calories = 0, protein = 0, carbs = 0, fat = 0;
+
+  entries.forEach(entry => {
+    if (entry.type === "product") {
+      const p = state.products[entry.itemId];
+      if (p) {
+        const mult = entry.amount / (p.serving || 100);
+        calories += p.calories * mult;
+        protein += p.protein * mult;
+        carbs += p.carbs * mult;
+        fat += p.fat * mult;
+      }
+    } else if (entry.type === "meal") {
+      const m = state.meals[entry.itemId];
+      if (m) {
+        const totals = computeMealMacros(m);
+        calories += totals.calories;
+        protein += totals.protein;
+        carbs += totals.carbs;
+        fat += totals.fat;
+      }
+    }
+  });
+
+  return {
+    calories: Math.round(calories),
+    protein: Math.round(protein * 10) / 10,
+    carbs: Math.round(carbs * 10) / 10,
+    fat: Math.round(fat * 10) / 10
+  };
+}
+
+function renderNutritionToday() {
+  const container = document.getElementById("nutrition-entries-today");
+  const summaryContainer = document.getElementById("nutrition-summary-today");
+  
+  if (!container) return;
+
+  const entries = state.nutritionEntries[state.selectedDate] || [];
+  const macros = computeDayMacros(entries);
+  const goals = state.nutritionGoals;
+
+  // Einträge rendern
+  container.innerHTML = entries.map(e => {
+    let itemName = "Unbekannt";
+    if (e.type === "product" && state.products[e.itemId]) {
+      itemName = state.products[e.itemId].name;
+    } else if (e.type === "meal" && state.meals[e.itemId]) {
+      itemName = state.meals[e.itemId].name;
+    }
+    
+    return `
+      <div class="nutrition-entry-item">
+        <div class="nutrition-entry-info">
+          <div class="nutrition-entry-name">${escHtml(itemName)}</div>
+          <div class="nutrition-entry-amount text-sm text-gray">${e.amount}g</div>
+        </div>
+        <button class="icon-btn delete-btn" onclick="deleteNutritionEntry('${e.id}')" aria-label="Löschen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
+      </div>
+    `;
+  }).join("");
+
+  if (entries.length === 0) {
+    container.innerHTML = '<p class="empty-state">Keine Einträge für heute. Logged deine erste Mahlzeit!</p>';
+  }
+
+  // Zusammenfassung rendern
+  if (summaryContainer) {
+    const caloriePercent = Math.min(100, Math.round((macros.calories / goals.calories) * 100));
+    const proteinPercent = Math.min(100, Math.round((macros.protein / goals.protein) * 100));
+    const carbsPercent = Math.min(100, Math.round((macros.carbs / goals.carbs) * 100));
+    const fatPercent = Math.min(100, Math.round((macros.fat / goals.fat) * 100));
+
+    summaryContainer.innerHTML = `
+      <div class="nutrition-summary-card">
+        <div class="nutrition-summary-main">
+          <div class="nutrition-calories">
+            <span class="nutrition-calories-value">${macros.calories}</span>
+            <span class="nutrition-calories-goal">/ ${goals.calories} kcal</span>
+          </div>
+          <div class="nutrition-progress-bar">
+            <div class="progress-bar-fill" style="width: ${caloriePercent}%"></div>
+          </div>
+        </div>
+
+        <div class="nutrition-macros-grid">
+          <div class="nutrition-macro">
+            <div class="nutrition-macro-label">Protein</div>
+            <div class="nutrition-macro-value">${macros.protein}g</div>
+            <div class="nutrition-macro-goal">${goals.protein}g</div>
+            <div class="progress-bar" style="background: #ccc;">
+              <div class="progress-bar-fill" style="width: ${proteinPercent}%; background: #ff6b6b;"></div>
+            </div>
+          </div>
+
+          <div class="nutrition-macro">
+            <div class="nutrition-macro-label">Kohlenhydrate</div>
+            <div class="nutrition-macro-value">${macros.carbs}g</div>
+            <div class="nutrition-macro-goal">${goals.carbs}g</div>
+            <div class="progress-bar" style="background: #ccc;">
+              <div class="progress-bar-fill" style="width: ${carbsPercent}%; background: #4ecdc4;"></div>
+            </div>
+          </div>
+
+          <div class="nutrition-macro">
+            <div class="nutrition-macro-label">Fett</div>
+            <div class="nutrition-macro-value">${macros.fat}g</div>
+            <div class="nutrition-macro-goal">${goals.fat}g</div>
+            <div class="progress-bar" style="background: #ccc;">
+              <div class="progress-bar-fill" style="width: ${fatPercent}%; background: #ffd93d;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+// ── Nutrition: Funktionen für Inline-onclick-Handler global verfügbar machen ──
+window.editProduct = editProduct;
+window.deleteProduct = deleteProduct;
+window.editMeal = editMeal;
+window.deleteMeal = deleteMeal;
+window.addMealProduct = addMealProduct;
+window.deleteNutritionEntry = deleteNutritionEntry;
+
+// ── Nutrition: Datum-Navigation ──
+
+function renderNutritionDateLabel() {
+  const el = document.getElementById("nutrition-date");
+  if (!el) return;
+  el.textContent = state.selectedDate === today() ? "Heute" : formatDate(state.selectedDate);
+}
+
+document.getElementById("nutrition-prev-day").addEventListener("click", () => {
+  const d = new Date(state.selectedDate + "T00:00:00");
+  d.setDate(d.getDate() - 1);
+  state.selectedDate = toDateString(d);
+  renderNutritionDateLabel();
+  renderNutritionToday();
+});
+
+document.getElementById("nutrition-next-day").addEventListener("click", () => {
+  const d = new Date(state.selectedDate + "T00:00:00");
+  d.setDate(d.getDate() + 1);
+  state.selectedDate = toDateString(d);
+  renderNutritionDateLabel();
+  renderNutritionToday();
+});
+
+// ── Nutrition: Tabs (Produkte / Mahlzeiten) ──
+
+document.querySelectorAll(".nutrition-tabs .tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".nutrition-tabs .tab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".nutrition-section .tab-content").forEach(c => c.classList.remove("active"));
+    document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+  });
+});
+
+// ── Nutrition: Produkt-Modal ──
+
+document.getElementById("nutrition-add-product-btn").addEventListener("click", () => {
+  state.editingProductId = null;
+  clearProductInputs();
+  document.querySelector("#modal-product .modal-title").textContent = "Produkt erstellen";
+  openModal("modal-product");
+});
+
+document.getElementById("cancel-product-btn").addEventListener("click", () => {
+  state.editingProductId = null;
+  closeModal("modal-product");
+});
+
+document.getElementById("save-product-btn").addEventListener("click", createProduct);
+
+// ── Nutrition: Mahlzeit-Modal ──
+
+document.getElementById("nutrition-add-meal-btn").addEventListener("click", () => {
+  state.editingMealId = null;
+  clearMealInputs();
+  document.querySelector("#modal-meal .modal-title").textContent = "Mahlzeit erstellen";
+  openModal("modal-meal");
+});
+
+document.getElementById("cancel-meal-btn").addEventListener("click", () => {
+  state.editingMealId = null;
+  closeModal("modal-meal");
+});
+
+document.getElementById("save-meal-btn").addEventListener("click", createMeal);
+
+document.getElementById("meal-product-search").addEventListener("input", (e) => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll("#meal-product-search-results .meal-product-selector-item").forEach(item => {
+    const name = item.querySelector(".font-bold")?.textContent.toLowerCase() || "";
+    item.style.display = name.includes(q) ? "flex" : "none";
+  });
+});
+
+// ── Nutrition: Eintrag loggen (Modal) ──
+
+document.getElementById("nutrition-log-type").addEventListener("change", updateNutritionLogItems);
+document.getElementById("cancel-nutrition-log-btn").addEventListener("click", () => closeModal("modal-nutrition-log"));
+document.getElementById("save-nutrition-log-btn").addEventListener("click", logNutritionEntry);
+
+// ═══════════════════════════════════════════════════════
 // 29. APP START — Login-Status prüfen, dann pro Nutzer initialisieren
 // ═══════════════════════════════════════════════════════
+
 
 function init() {
   renderCalendar();
   renderWeekStrip();
   renderDashboardHero();
+  renderNutritionDateLabel();
   navigate("calendar");
   updateNotifBanner();
 

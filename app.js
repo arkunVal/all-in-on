@@ -2784,9 +2784,7 @@ document.getElementById("header-action-btn").addEventListener("click", () => {
   }
 
   if (state.currentView === "nutrition") {
-    clearNutritionLogInputs();
-    updateNutritionLogItems();
-    openModal("modal-nutrition-log");
+    openNutritionLogModal("breakfast");
     return;
   }
 
@@ -3684,6 +3682,7 @@ function computeMealMacros(meal) {
 // ── TÄGLICHES TRACKING ──
 
 async function logNutritionEntry() {
+  const category = document.getElementById("nutrition-log-category").value;
   const type = document.getElementById("nutrition-log-type").value;
   const itemId = document.getElementById("nutrition-log-item").value;
   const amount = Number(document.getElementById("nutrition-log-amount").value);
@@ -3696,6 +3695,7 @@ async function logNutritionEntry() {
   const dateStr = state.selectedDate;
   const entries = state.nutritionEntries[dateStr] || [];
   const newEntry = {
+    category,
     type,
     itemId,
     amount,
@@ -3725,6 +3725,13 @@ async function deleteNutritionEntry(entryId) {
   showToast("Eintrag gelöscht ✓");
   renderNutritionToday();
 }
+
+const NUTRITION_CATEGORIES = [
+  { id: "breakfast", label: "🌅 Frühstück" },
+  { id: "lunch",     label: "🍽️ Mittagessen" },
+  { id: "dinner",    label: "🌙 Abendessen" },
+  { id: "snacks",    label: "🍎 Snacks" }
+];
 
 function updateNutritionLogItems() {
   const type = document.getElementById("nutrition-log-type").value;
@@ -3769,39 +3776,38 @@ function computeDayMacros(entries) {
 }
 
 function renderNutritionToday() {
-  const container = document.getElementById("nutrition-entries-today");
   const summaryContainer = document.getElementById("nutrition-summary-today");
-  
-  if (!container) return;
-
   const entries = state.nutritionEntries[state.selectedDate] || [];
   const macros = computeDayMacros(entries);
 
-  // Einträge rendern
-  container.innerHTML = entries.map(e => {
-    let itemName = "Unbekannt";
-    if (e.type === "product" && state.products[e.itemId]) {
-      itemName = state.products[e.itemId].name;
-    } else if (e.type === "meal" && state.meals[e.itemId]) {
-      itemName = state.meals[e.itemId].name;
-    }
-    
-    return `
-      <div class="nutrition-entry-item">
+  function entryItemName(e) {
+    if (e.type === "product" && state.products[e.itemId]) return state.products[e.itemId].name;
+    if (e.type === "meal" && state.meals[e.itemId]) return state.meals[e.itemId].name;
+    return "Unbekannt";
+  }
+
+  // Einträge pro Kategorie rendern (unkategorisierte ältere Einträge landen unter "Snacks")
+  NUTRITION_CATEGORIES.forEach(cat => {
+    const listEl = document.getElementById(`nutrition-entries-${cat.id}`);
+    if (!listEl) return;
+    const catEntries = entries.filter(e => (e.category || "snacks") === cat.id);
+
+    listEl.innerHTML = catEntries.map(e => `
+      <li class="nutrition-entry-item">
         <div class="nutrition-entry-info">
-          <div class="nutrition-entry-name">${escHtml(itemName)}</div>
+          <div class="nutrition-entry-name">${escHtml(entryItemName(e))}</div>
           <div class="nutrition-entry-amount text-sm text-gray">${e.amount}g</div>
         </div>
         <button class="icon-btn delete-btn" onclick="deleteNutritionEntry('${e.id}')" aria-label="Löschen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </button>
-      </div>
-    `;
-  }).join("");
+      </li>
+    `).join("");
 
-  if (entries.length === 0) {
-    container.innerHTML = '<p class="empty-state">Keine Einträge für heute. Logged deine erste Mahlzeit!</p>';
-  }
+    if (catEntries.length === 0) {
+      listEl.innerHTML = '<li class="empty-state">Noch nichts eingetragen.</li>';
+    }
+  });
 
   // Zusammenfassung rendern — reine Tagessumme, ohne Ziele
   if (summaryContainer) {
@@ -3931,6 +3937,17 @@ document.getElementById("meal-product-search").addEventListener("input", (e) => 
 });
 
 // ── Nutrition: Eintrag loggen (Modal) ──
+
+function openNutritionLogModal(category) {
+  clearNutritionLogInputs();
+  document.getElementById("nutrition-log-category").value = category || "breakfast";
+  updateNutritionLogItems();
+  openModal("modal-nutrition-log");
+}
+
+document.querySelectorAll(".nutrition-category-add").forEach(btn => {
+  btn.addEventListener("click", () => openNutritionLogModal(btn.dataset.category));
+});
 
 document.getElementById("nutrition-log-type").addEventListener("change", updateNutritionLogItems);
 document.getElementById("cancel-nutrition-log-btn").addEventListener("click", () => closeModal("modal-nutrition-log"));

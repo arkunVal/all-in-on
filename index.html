@@ -253,11 +253,52 @@
         <!-- Zusammenfassung Heute -->
         <div id="nutrition-summary-today"></div>
 
-        <!-- Heutige Einträge -->
-        <div class="nutrition-section">
-          <h3>Meine Mahlzeiten</h3>
-          <ul id="nutrition-entries-today" class="nutrition-entries-list">
-            <li class="empty-state">Keine Einträge für heute.</li>
+        <!-- Heutige Einträge, nach Mahlzeit-Kategorie -->
+        <div class="nutrition-section nutrition-category-section" data-category="breakfast">
+          <div class="nutrition-category-header">
+            <h3>🌅 Frühstück</h3>
+            <button class="icon-btn nutrition-category-add" data-category="breakfast" aria-label="Zum Frühstück hinzufügen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <ul id="nutrition-entries-breakfast" class="nutrition-entries-list">
+            <li class="empty-state">Noch nichts eingetragen.</li>
+          </ul>
+        </div>
+
+        <div class="nutrition-section nutrition-category-section" data-category="lunch">
+          <div class="nutrition-category-header">
+            <h3>🍽️ Mittagessen</h3>
+            <button class="icon-btn nutrition-category-add" data-category="lunch" aria-label="Zum Mittagessen hinzufügen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <ul id="nutrition-entries-lunch" class="nutrition-entries-list">
+            <li class="empty-state">Noch nichts eingetragen.</li>
+          </ul>
+        </div>
+
+        <div class="nutrition-section nutrition-category-section" data-category="dinner">
+          <div class="nutrition-category-header">
+            <h3>🌙 Abendessen</h3>
+            <button class="icon-btn nutrition-category-add" data-category="dinner" aria-label="Zum Abendessen hinzufügen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <ul id="nutrition-entries-dinner" class="nutrition-entries-list">
+            <li class="empty-state">Noch nichts eingetragen.</li>
+          </ul>
+        </div>
+
+        <div class="nutrition-section nutrition-category-section" data-category="snacks">
+          <div class="nutrition-category-header">
+            <h3>🍎 Snacks</h3>
+            <button class="icon-btn nutrition-category-add" data-category="snacks" aria-label="Zu Snacks hinzufügen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <ul id="nutrition-entries-snacks" class="nutrition-entries-list">
+            <li class="empty-state">Noch nichts eingetragen.</li>
           </ul>
         </div>
 
@@ -1138,6 +1179,15 @@
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <h2 class="modal-title">Eintrag hinzufügen</h2>
+      <div class="form-group">
+        <label class="form-label" for="nutrition-log-category">Mahlzeit</label>
+        <select class="form-input form-select" id="nutrition-log-category">
+          <option value="breakfast">🌅 Frühstück</option>
+          <option value="lunch">🍽️ Mittagessen</option>
+          <option value="dinner">🌙 Abendessen</option>
+          <option value="snacks">🍎 Snacks</option>
+        </select>
+      </div>
       <div class="form-group">
         <label class="form-label" for="nutrition-log-type">Typ</label>
         <select class="form-input form-select" id="nutrition-log-type">

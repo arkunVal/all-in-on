@@ -137,7 +137,8 @@ const state = {
   meals:                 {},  // { id: { name, items: [ { productId, amount } ] } }
   nutritionEntries:      {},  // { "YYYY-MM-DD": [ { id, type: 'product'|'meal', itemId, amount, timestamp } ] }
   editingProductId:      null,
-  editingMealId:         null
+  editingMealId:         null,
+  nutritionGoals:        { calories: 3200, protein: 150, fat: 80, carbs: 450 }
 };
 
 // ═══════════════════════════════════════════════════════
@@ -3464,10 +3465,15 @@ function editProduct(id) {
   openModal("modal-product");
 }
 
+/** Sortiert ein Array von Objekten mit .name alphabetisch (deutsche Sortierreihenfolge) */
+function sortByName(arr) {
+  return arr.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "de"));
+}
+
 function renderNutritionProducts() {
   const container = document.getElementById("nutrition-products-list");
   if (!container) return;
-  const products = toArray(state.products);
+  const products = sortByName(toArray(state.products));
   container.innerHTML = products.map(p => `
     <div class="nutrition-product-item">
       <div class="nutrition-product-info">
@@ -3535,7 +3541,7 @@ function clearMealInputs() {
 function renderMealProductSelector() {
   const container = document.getElementById("meal-product-search-results");
   if (!container) return;
-  const products = toArray(state.products);
+  const products = sortByName(toArray(state.products));
   container.innerHTML = products.map(p => `
     <div class="meal-product-selector-item" data-product-id="${p.id}">
       <div>
@@ -3608,7 +3614,7 @@ function editMeal(id) {
 function renderNutritionMeals() {
   const container = document.getElementById("nutrition-meals-list");
   if (!container) return;
-  const meals = toArray(state.meals);
+  const meals = sortByName(toArray(state.meals));
   container.innerHTML = meals.map(m => {
     const totals = computeMealMacros(m);
     return `
@@ -3738,10 +3744,10 @@ function updateNutritionLogItems() {
   const select = document.getElementById("nutrition-log-item");
   
   if (type === "product") {
-    const products = toArray(state.products);
+    const products = sortByName(toArray(state.products));
     select.innerHTML = products.map(p => `<option value="${p.id}">${escHtml(p.name)} (${p.serving}g)</option>`).join("");
   } else {
-    const meals = toArray(state.meals);
+    const meals = sortByName(toArray(state.meals));
     select.innerHTML = meals.map(m => `<option value="${m.id}">${escHtml(m.name)}</option>`).join("");
   }
 }
@@ -3809,33 +3815,52 @@ function renderNutritionToday() {
     }
   });
 
-  // Zusammenfassung rendern — reine Tagessumme, ohne Ziele
+  // Zusammenfassung rendern — Tagessumme gegen feste Ziele
   if (summaryContainer) {
+    const goals = state.nutritionGoals;
+    const caloriePercent = Math.min(100, Math.round((macros.calories / goals.calories) * 100));
+    const proteinPercent = Math.min(100, Math.round((macros.protein / goals.protein) * 100));
+    const carbsPercent   = Math.min(100, Math.round((macros.carbs / goals.carbs) * 100));
+    const fatPercent     = Math.min(100, Math.round((macros.fat / goals.fat) * 100));
+
     summaryContainer.innerHTML = `
       <div class="nutrition-summary-card">
         <div class="nutrition-summary-main">
           <div class="nutrition-calories">
             <span class="nutrition-calories-value">${macros.calories}</span>
-            <span class="nutrition-calories-goal">kcal</span>
+            <span class="nutrition-calories-goal">/ ${goals.calories} kcal</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-bar-fill" style="width: ${caloriePercent}%"></div>
           </div>
         </div>
 
         <div class="nutrition-macros-grid">
           <div class="nutrition-macro">
+            <div class="nutrition-macro-label">Protein</div>
+            <div class="nutrition-macro-value">${macros.protein}g</div>
+            <div class="nutrition-macro-goal">Ziel: ${goals.protein}g</div>
+            <div class="progress-bar">
+              <div class="progress-bar-fill" style="width: ${proteinPercent}%; background: #ff6b6b;"></div>
+            </div>
+          </div>
+
+          <div class="nutrition-macro">
             <div class="nutrition-macro-label">Fett</div>
             <div class="nutrition-macro-value">${macros.fat}g</div>
-            <div class="nutrition-macro-goal">davon gesättigt: ${macros.satFat}g</div>
+            <div class="nutrition-macro-goal">Ziel: ${goals.fat}g · davon gesättigt: ${macros.satFat}g</div>
+            <div class="progress-bar">
+              <div class="progress-bar-fill" style="width: ${fatPercent}%; background: #ffd93d;"></div>
+            </div>
           </div>
 
           <div class="nutrition-macro">
             <div class="nutrition-macro-label">Kohlenhydrate</div>
             <div class="nutrition-macro-value">${macros.carbs}g</div>
-            <div class="nutrition-macro-goal">davon Zucker: ${macros.sugar}g</div>
-          </div>
-
-          <div class="nutrition-macro">
-            <div class="nutrition-macro-label">Protein</div>
-            <div class="nutrition-macro-value">${macros.protein}g</div>
+            <div class="nutrition-macro-goal">Ziel: ${goals.carbs}g · davon Zucker: ${macros.sugar}g</div>
+            <div class="progress-bar">
+              <div class="progress-bar-fill" style="width: ${carbsPercent}%; background: #4ecdc4;"></div>
+            </div>
           </div>
 
           <div class="nutrition-macro">

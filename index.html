@@ -1063,26 +1063,43 @@
         <label class="form-label" for="product-serving-input">Portionsgröße (g)</label>
         <input class="form-input" id="product-serving-input" type="number" placeholder="100" value="100" min="1" />
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label" for="product-calories-input">Kalorien (kcal)</label>
-          <input class="form-input" id="product-calories-input" type="number" placeholder="0" min="0" />
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="product-protein-input">Protein (g)</label>
-          <input class="form-input" id="product-protein-input" type="number" placeholder="0" min="0" step="0.1" />
-        </div>
+      <div class="form-group">
+        <label class="form-label" for="product-calories-input">Kalorien (kcal)</label>
+        <input class="form-input" id="product-calories-input" type="number" placeholder="0" min="0" />
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label" for="product-carbs-input">Kohlenhydrate (g)</label>
-          <input class="form-input" id="product-carbs-input" type="number" placeholder="0" min="0" step="0.1" />
-        </div>
-        <div class="form-group">
+
+      <p class="nutrition-table-title">Nährwerte</p>
+      <div class="nutrition-table">
+        <div class="nutrition-table-row">
           <label class="form-label" for="product-fat-input">Fett (g)</label>
           <input class="form-input" id="product-fat-input" type="number" placeholder="0" min="0" step="0.1" />
         </div>
+        <div class="nutrition-table-row nutrition-table-sub">
+          <label class="form-label" for="product-satfat-input">davon gesättigte Fettsäuren (g)</label>
+          <input class="form-input" id="product-satfat-input" type="number" placeholder="0" min="0" step="0.1" />
+        </div>
+        <div class="nutrition-table-row">
+          <label class="form-label" for="product-carbs-input">Kohlenhydrate (g)</label>
+          <input class="form-input" id="product-carbs-input" type="number" placeholder="0" min="0" step="0.1" />
+        </div>
+        <div class="nutrition-table-row nutrition-table-sub">
+          <label class="form-label" for="product-sugar-input">davon Zucker (g)</label>
+          <input class="form-input" id="product-sugar-input" type="number" placeholder="0" min="0" step="0.1" />
+        </div>
+        <div class="nutrition-table-row">
+          <label class="form-label" for="product-fiber-input">Ballaststoffe (g)</label>
+          <input class="form-input" id="product-fiber-input" type="number" placeholder="0" min="0" step="0.1" />
+        </div>
+        <div class="nutrition-table-row">
+          <label class="form-label" for="product-protein-input">Proteine (g)</label>
+          <input class="form-input" id="product-protein-input" type="number" placeholder="0" min="0" step="0.1" />
+        </div>
+        <div class="nutrition-table-row">
+          <label class="form-label" for="product-salt-input">Salz (g)</label>
+          <input class="form-input" id="product-salt-input" type="number" placeholder="0" min="0" step="0.1" />
+        </div>
       </div>
+
       <p class="form-hint">Alle Werte beziehen sich auf die angegebene Portionsgröße.</p>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="cancel-product-btn">Abbrechen</button>

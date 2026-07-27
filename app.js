@@ -136,7 +136,6 @@ const state = {
   products:              {},  // { id: { name, calories, protein, carbs, fat, servingSize } }
   meals:                 {},  // { id: { name, items: [ { productId, amount } ] } }
   nutritionEntries:      {},  // { "YYYY-MM-DD": [ { id, type: 'product'|'meal', itemId, amount, timestamp } ] }
-  nutritionGoals:        { calories: 2000, protein: 150, carbs: 250, fat: 65 },
   editingProductId:      null,
   editingMealId:         null
 };
@@ -3402,9 +3401,13 @@ function notifyServiceWorkerOfUid(uid) {
 async function createProduct() {
   const name = document.getElementById("product-name-input").value.trim();
   const calories = Number(document.getElementById("product-calories-input").value) || 0;
-  const protein = Number(document.getElementById("product-protein-input").value) || 0;
-  const carbs = Number(document.getElementById("product-carbs-input").value) || 0;
   const fat = Number(document.getElementById("product-fat-input").value) || 0;
+  const satFat = Number(document.getElementById("product-satfat-input").value) || 0;
+  const carbs = Number(document.getElementById("product-carbs-input").value) || 0;
+  const sugar = Number(document.getElementById("product-sugar-input").value) || 0;
+  const fiber = Number(document.getElementById("product-fiber-input").value) || 0;
+  const protein = Number(document.getElementById("product-protein-input").value) || 0;
+  const salt = Number(document.getElementById("product-salt-input").value) || 0;
   const serving = Number(document.getElementById("product-serving-input").value) || 100;
 
   if (!name) {
@@ -3412,13 +3415,15 @@ async function createProduct() {
     return;
   }
 
+  const data = { name, calories, fat, satFat, carbs, sugar, fiber, protein, salt, serving };
+
   if (state.editingProductId) {
-    await set(REFS.product(state.editingProductId), { name, calories, protein, carbs, fat, serving });
+    await set(REFS.product(state.editingProductId), data);
     state.editingProductId = null;
     showToast("Produkt aktualisiert ✓");
   } else {
     const newRef = push(REFS.products());
-    await set(newRef, { name, calories, protein, carbs, fat, serving });
+    await set(newRef, data);
     showToast("Produkt erstellt ✓");
   }
 
@@ -3427,11 +3432,9 @@ async function createProduct() {
 }
 
 function clearProductInputs() {
-  document.getElementById("product-name-input").value = "";
-  document.getElementById("product-calories-input").value = "";
-  document.getElementById("product-protein-input").value = "";
-  document.getElementById("product-carbs-input").value = "";
-  document.getElementById("product-fat-input").value = "";
+  ["product-name-input","product-calories-input","product-fat-input","product-satfat-input",
+   "product-carbs-input","product-sugar-input","product-fiber-input","product-protein-input","product-salt-input"]
+    .forEach(id => document.getElementById(id).value = "");
   document.getElementById("product-serving-input").value = "100";
 }
 
@@ -3452,9 +3455,13 @@ function editProduct(id) {
   state.editingProductId = id;
   document.getElementById("product-name-input").value = p.name;
   document.getElementById("product-calories-input").value = p.calories;
-  document.getElementById("product-protein-input").value = p.protein;
-  document.getElementById("product-carbs-input").value = p.carbs;
   document.getElementById("product-fat-input").value = p.fat;
+  document.getElementById("product-satfat-input").value = p.satFat || 0;
+  document.getElementById("product-carbs-input").value = p.carbs;
+  document.getElementById("product-sugar-input").value = p.sugar || 0;
+  document.getElementById("product-fiber-input").value = p.fiber || 0;
+  document.getElementById("product-protein-input").value = p.protein;
+  document.getElementById("product-salt-input").value = p.salt || 0;
   document.getElementById("product-serving-input").value = p.serving || 100;
   openModal("modal-product");
 }
@@ -3469,9 +3476,10 @@ function renderNutritionProducts() {
         <div class="nutrition-product-name">${escHtml(p.name)}</div>
         <div class="nutrition-product-macros">
           <span>${p.calories} kcal</span> · 
-          <span>P: ${p.protein}g</span> · 
+          <span>F: ${p.fat}g</span> · 
           <span>K: ${p.carbs}g</span> · 
-          <span>F: ${p.fat}g</span>
+          <span>P: ${p.protein}g</span> · 
+          <span>Salz: ${p.salt || 0}g</span>
         </div>
         <div class="nutrition-product-serving">${p.serving}g pro Portion</div>
       </div>
@@ -3634,24 +3642,43 @@ function renderNutritionMeals() {
   }
 }
 
+// ── Helfer: Nährwert-Akkumulation über alle Felder ──
+function emptyMacros() {
+  return { calories: 0, fat: 0, satFat: 0, carbs: 0, sugar: 0, fiber: 0, protein: 0, salt: 0 };
+}
+function addProductMacros(acc, p, mult) {
+  acc.calories += (p.calories || 0) * mult;
+  acc.fat      += (p.fat || 0) * mult;
+  acc.satFat   += (p.satFat || 0) * mult;
+  acc.carbs    += (p.carbs || 0) * mult;
+  acc.sugar    += (p.sugar || 0) * mult;
+  acc.fiber    += (p.fiber || 0) * mult;
+  acc.protein  += (p.protein || 0) * mult;
+  acc.salt     += (p.salt || 0) * mult;
+}
+function roundMacros(acc) {
+  return {
+    calories: Math.round(acc.calories),
+    fat: Math.round(acc.fat * 10) / 10,
+    satFat: Math.round(acc.satFat * 10) / 10,
+    carbs: Math.round(acc.carbs * 10) / 10,
+    sugar: Math.round(acc.sugar * 10) / 10,
+    fiber: Math.round(acc.fiber * 10) / 10,
+    protein: Math.round(acc.protein * 10) / 10,
+    salt: Math.round(acc.salt * 100) / 100
+  };
+}
+
 function computeMealMacros(meal) {
-  let calories = 0, protein = 0, carbs = 0, fat = 0;
+  const acc = emptyMacros();
   (meal.items || []).forEach(item => {
     const p = state.products[item.productId];
     if (p) {
       const mult = item.amount / (p.serving || 100);
-      calories += p.calories * mult;
-      protein += p.protein * mult;
-      carbs += p.carbs * mult;
-      fat += p.fat * mult;
+      addProductMacros(acc, p, mult);
     }
   });
-  return {
-    calories: Math.round(calories),
-    protein: Math.round(protein * 10) / 10,
-    carbs: Math.round(carbs * 10) / 10,
-    fat: Math.round(fat * 10) / 10
-  };
+  return roundMacros(acc);
 }
 
 // ── TÄGLICHES TRACKING ──
@@ -3713,36 +3740,32 @@ function updateNutritionLogItems() {
 }
 
 function computeDayMacros(entries) {
-  let calories = 0, protein = 0, carbs = 0, fat = 0;
+  const acc = emptyMacros();
 
   entries.forEach(entry => {
     if (entry.type === "product") {
       const p = state.products[entry.itemId];
       if (p) {
         const mult = entry.amount / (p.serving || 100);
-        calories += p.calories * mult;
-        protein += p.protein * mult;
-        carbs += p.carbs * mult;
-        fat += p.fat * mult;
+        addProductMacros(acc, p, mult);
       }
     } else if (entry.type === "meal") {
       const m = state.meals[entry.itemId];
       if (m) {
         const totals = computeMealMacros(m);
-        calories += totals.calories;
-        protein += totals.protein;
-        carbs += totals.carbs;
-        fat += totals.fat;
+        acc.calories += totals.calories;
+        acc.fat      += totals.fat;
+        acc.satFat   += totals.satFat;
+        acc.carbs    += totals.carbs;
+        acc.sugar    += totals.sugar;
+        acc.fiber    += totals.fiber;
+        acc.protein  += totals.protein;
+        acc.salt     += totals.salt;
       }
     }
   });
 
-  return {
-    calories: Math.round(calories),
-    protein: Math.round(protein * 10) / 10,
-    carbs: Math.round(carbs * 10) / 10,
-    fat: Math.round(fat * 10) / 10
-  };
+  return roundMacros(acc);
 }
 
 function renderNutritionToday() {
@@ -3753,7 +3776,6 @@ function renderNutritionToday() {
 
   const entries = state.nutritionEntries[state.selectedDate] || [];
   const macros = computeDayMacros(entries);
-  const goals = state.nutritionGoals;
 
   // Einträge rendern
   container.innerHTML = entries.map(e => {
@@ -3781,51 +3803,43 @@ function renderNutritionToday() {
     container.innerHTML = '<p class="empty-state">Keine Einträge für heute. Logged deine erste Mahlzeit!</p>';
   }
 
-  // Zusammenfassung rendern
+  // Zusammenfassung rendern — reine Tagessumme, ohne Ziele
   if (summaryContainer) {
-    const caloriePercent = Math.min(100, Math.round((macros.calories / goals.calories) * 100));
-    const proteinPercent = Math.min(100, Math.round((macros.protein / goals.protein) * 100));
-    const carbsPercent = Math.min(100, Math.round((macros.carbs / goals.carbs) * 100));
-    const fatPercent = Math.min(100, Math.round((macros.fat / goals.fat) * 100));
-
     summaryContainer.innerHTML = `
       <div class="nutrition-summary-card">
         <div class="nutrition-summary-main">
           <div class="nutrition-calories">
             <span class="nutrition-calories-value">${macros.calories}</span>
-            <span class="nutrition-calories-goal">/ ${goals.calories} kcal</span>
-          </div>
-          <div class="nutrition-progress-bar">
-            <div class="progress-bar-fill" style="width: ${caloriePercent}%"></div>
+            <span class="nutrition-calories-goal">kcal</span>
           </div>
         </div>
 
         <div class="nutrition-macros-grid">
           <div class="nutrition-macro">
-            <div class="nutrition-macro-label">Protein</div>
-            <div class="nutrition-macro-value">${macros.protein}g</div>
-            <div class="nutrition-macro-goal">${goals.protein}g</div>
-            <div class="progress-bar" style="background: #ccc;">
-              <div class="progress-bar-fill" style="width: ${proteinPercent}%; background: #ff6b6b;"></div>
-            </div>
+            <div class="nutrition-macro-label">Fett</div>
+            <div class="nutrition-macro-value">${macros.fat}g</div>
+            <div class="nutrition-macro-goal">davon gesättigt: ${macros.satFat}g</div>
           </div>
 
           <div class="nutrition-macro">
             <div class="nutrition-macro-label">Kohlenhydrate</div>
             <div class="nutrition-macro-value">${macros.carbs}g</div>
-            <div class="nutrition-macro-goal">${goals.carbs}g</div>
-            <div class="progress-bar" style="background: #ccc;">
-              <div class="progress-bar-fill" style="width: ${carbsPercent}%; background: #4ecdc4;"></div>
-            </div>
+            <div class="nutrition-macro-goal">davon Zucker: ${macros.sugar}g</div>
           </div>
 
           <div class="nutrition-macro">
-            <div class="nutrition-macro-label">Fett</div>
-            <div class="nutrition-macro-value">${macros.fat}g</div>
-            <div class="nutrition-macro-goal">${goals.fat}g</div>
-            <div class="progress-bar" style="background: #ccc;">
-              <div class="progress-bar-fill" style="width: ${fatPercent}%; background: #ffd93d;"></div>
-            </div>
+            <div class="nutrition-macro-label">Protein</div>
+            <div class="nutrition-macro-value">${macros.protein}g</div>
+          </div>
+
+          <div class="nutrition-macro">
+            <div class="nutrition-macro-label">Ballaststoffe</div>
+            <div class="nutrition-macro-value">${macros.fiber}g</div>
+          </div>
+
+          <div class="nutrition-macro">
+            <div class="nutrition-macro-label">Salz</div>
+            <div class="nutrition-macro-value">${macros.salt}g</div>
           </div>
         </div>
       </div>

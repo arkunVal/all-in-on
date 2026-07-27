@@ -2105,8 +2105,8 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 
 .nutrition-macros-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-md);
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md) var(--space-lg);
 }
 .nutrition-macro { display: flex; flex-direction: column; gap: 4px; }
 .nutrition-macro-label {
@@ -2243,6 +2243,51 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
   color: var(--text-2);
   margin-top: -8px;
   margin-bottom: var(--space-md);
+}
+
+.nutrition-table-title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-1);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: var(--space-md) 0 var(--space-sm);
+}
+.nutrition-table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: var(--space-md);
+}
+.nutrition-table-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: 10px var(--space-md);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+}
+.nutrition-table-row:last-child { border-bottom: none; }
+.nutrition-table-row .form-label {
+  margin-bottom: 0;
+  flex: 1;
+  font-weight: 500;
+}
+.nutrition-table-row .form-input {
+  width: 88px;
+  flex: none;
+  text-align: right;
+  padding: 8px 10px;
+}
+.nutrition-table-sub {
+  padding-left: var(--space-lg);
+  background: var(--bg-1);
+}
+.nutrition-table-sub .form-label {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  font-weight: 400;
 }
 
 .font-bold { font-weight: 700; }

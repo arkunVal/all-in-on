@@ -3742,13 +3742,25 @@ const NUTRITION_CATEGORIES = [
 function updateNutritionLogItems() {
   const type = document.getElementById("nutrition-log-type").value;
   const select = document.getElementById("nutrition-log-item");
+  const amountInput = document.getElementById("nutrition-log-amount");
+  const amountLabel = document.getElementById("nutrition-log-amount-label");
+  const amountHint = document.getElementById("nutrition-log-amount-hint");
   
   if (type === "product") {
     const products = sortByName(toArray(state.products));
     select.innerHTML = products.map(p => `<option value="${p.id}">${escHtml(p.name)} (${p.serving}g)</option>`).join("");
+    amountLabel.textContent = "Menge (g)";
+    amountInput.placeholder = "100";
+    amountInput.removeAttribute("max");
+    amountHint.style.display = "none";
   } else {
     const meals = sortByName(toArray(state.meals));
     select.innerHTML = meals.map(m => `<option value="${m.id}">${escHtml(m.name)}</option>`).join("");
+    amountLabel.textContent = "Anteil (%)";
+    amountInput.placeholder = "100";
+    amountInput.value = "100";
+    amountInput.max = "500";
+    amountHint.style.display = "block";
   }
 }
 
@@ -3766,14 +3778,15 @@ function computeDayMacros(entries) {
       const m = state.meals[entry.itemId];
       if (m) {
         const totals = computeMealMacros(m);
-        acc.calories += totals.calories;
-        acc.fat      += totals.fat;
-        acc.satFat   += totals.satFat;
-        acc.carbs    += totals.carbs;
-        acc.sugar    += totals.sugar;
-        acc.fiber    += totals.fiber;
-        acc.protein  += totals.protein;
-        acc.salt     += totals.salt;
+        const mult = (entry.amount || 100) / 100; // amount = gegessener Anteil in %
+        acc.calories += totals.calories * mult;
+        acc.fat      += totals.fat * mult;
+        acc.satFat   += totals.satFat * mult;
+        acc.carbs    += totals.carbs * mult;
+        acc.sugar    += totals.sugar * mult;
+        acc.fiber    += totals.fiber * mult;
+        acc.protein  += totals.protein * mult;
+        acc.salt     += totals.salt * mult;
       }
     }
   });
@@ -3802,7 +3815,7 @@ function renderNutritionToday() {
       <li class="nutrition-entry-item">
         <div class="nutrition-entry-info">
           <div class="nutrition-entry-name">${escHtml(entryItemName(e))}</div>
-          <div class="nutrition-entry-amount text-sm text-gray">${e.amount}g</div>
+          <div class="nutrition-entry-amount text-sm text-gray">${e.amount}${e.type === "meal" ? "%" : "g"}</div>
         </div>
         <button class="icon-btn delete-btn" onclick="deleteNutritionEntry('${e.id}')" aria-label="Löschen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>

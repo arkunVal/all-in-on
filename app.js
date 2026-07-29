@@ -3794,6 +3794,31 @@ function computeDayMacros(entries) {
   return roundMacros(acc);
 }
 
+// ── Helfer: eine "Noch offen"-Zeile für ein Makro (Protein/Kohlenhydrate/Fett) ──
+function nutritionRemainingRowHtml(label, colorVar, consumed, goal) {
+  const pct = Math.min(100, Math.round((consumed / goal) * 100));
+  const remaining = Math.round((goal - consumed) * 10) / 10;
+  const over = remaining < 0;
+  const barColor = over ? "var(--danger)" : colorVar;
+  const valueHtml = over
+    ? `<span class="nutrition-remaining-over">+${Math.abs(remaining)}g über</span>`
+    : `<span class="nutrition-remaining-num">${remaining}g</span> <span class="nutrition-remaining-suffix">offen</span>`;
+
+  return `
+    <div class="nutrition-remaining-item">
+      <div class="nutrition-remaining-top">
+        <span class="nutrition-remaining-dot" style="background:${colorVar}"></span>
+        <span class="nutrition-remaining-label">${label}</span>
+      </div>
+      <div class="nutrition-remaining-value">${valueHtml}</div>
+      <div class="nutrition-remaining-bar">
+        <div class="nutrition-remaining-fill" style="width:${pct}%; background:${barColor}"></div>
+      </div>
+      <div class="nutrition-remaining-consumed">${consumed}g von ${goal}g</div>
+    </div>
+  `;
+}
+
 function renderNutritionToday() {
   const summaryContainer = document.getElementById("nutrition-summary-today");
   const entries = state.nutritionEntries[state.selectedDate] || [];
@@ -3828,63 +3853,37 @@ function renderNutritionToday() {
     }
   });
 
-  // Zusammenfassung rendern — Tagessumme gegen feste Ziele
+  // Zusammenfassung rendern — Ring-Diagramm für Kalorien + "noch offen" pro Makro
   if (summaryContainer) {
     const goals = state.nutritionGoals;
-    const caloriePercent = Math.min(100, Math.round((macros.calories / goals.calories) * 100));
-    const proteinPercent = Math.min(100, Math.round((macros.protein / goals.protein) * 100));
-    const carbsPercent   = Math.min(100, Math.round((macros.carbs / goals.carbs) * 100));
-    const fatPercent     = Math.min(100, Math.round((macros.fat / goals.fat) * 100));
+    const caloriePercent = Math.min(100, (macros.calories / goals.calories) * 100);
+    const ringDeg = caloriePercent * 3.6;
+    const caloriesRemaining = Math.round(goals.calories - macros.calories);
+    const overCalories = caloriesRemaining < 0;
+    const ringColor = overCalories ? "var(--danger)" : "var(--accent)";
 
     summaryContainer.innerHTML = `
       <div class="nutrition-summary-card">
-        <div class="nutrition-summary-main">
-          <div class="nutrition-calories">
-            <span class="nutrition-calories-value">${macros.calories}</span>
-            <span class="nutrition-calories-goal">/ ${goals.calories} kcal</span>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-bar-fill" style="width: ${caloriePercent}%"></div>
+        <div class="nutrition-ring-wrap">
+          <div class="nutrition-ring" style="background: conic-gradient(${ringColor} ${ringDeg}deg, var(--bg-3) 0deg);"></div>
+          <div class="nutrition-ring-inner">
+            <div class="nutrition-ring-value" style="${overCalories ? "color:var(--danger)" : ""}">${overCalories ? "+" + Math.abs(caloriesRemaining) : caloriesRemaining}</div>
+            <div class="nutrition-ring-label">${overCalories ? "kcal über Ziel" : "kcal übrig"}</div>
           </div>
         </div>
+        <div class="nutrition-ring-sub">${macros.calories} von ${goals.calories} kcal gegessen</div>
 
-        <div class="nutrition-macros-grid">
-          <div class="nutrition-macro">
-            <div class="nutrition-macro-label">Protein</div>
-            <div class="nutrition-macro-value">${macros.protein}g</div>
-            <div class="nutrition-macro-goal">Ziel: ${goals.protein}g</div>
-            <div class="progress-bar">
-              <div class="progress-bar-fill" style="width: ${proteinPercent}%; background: #ff6b6b;"></div>
-            </div>
-          </div>
+        <div class="nutrition-remaining-grid">
+          ${nutritionRemainingRowHtml("Protein", "var(--prio-high)", macros.protein, goals.protein)}
+          ${nutritionRemainingRowHtml("Kohlenhydrate", "var(--success)", macros.carbs, goals.carbs)}
+          ${nutritionRemainingRowHtml("Fett", "var(--warning)", macros.fat, goals.fat)}
+        </div>
 
-          <div class="nutrition-macro">
-            <div class="nutrition-macro-label">Fett</div>
-            <div class="nutrition-macro-value">${macros.fat}g</div>
-            <div class="nutrition-macro-goal">Ziel: ${goals.fat}g · davon gesättigt: ${macros.satFat}g</div>
-            <div class="progress-bar">
-              <div class="progress-bar-fill" style="width: ${fatPercent}%; background: #ffd93d;"></div>
-            </div>
-          </div>
-
-          <div class="nutrition-macro">
-            <div class="nutrition-macro-label">Kohlenhydrate</div>
-            <div class="nutrition-macro-value">${macros.carbs}g</div>
-            <div class="nutrition-macro-goal">Ziel: ${goals.carbs}g · davon Zucker: ${macros.sugar}g</div>
-            <div class="progress-bar">
-              <div class="progress-bar-fill" style="width: ${carbsPercent}%; background: #4ecdc4;"></div>
-            </div>
-          </div>
-
-          <div class="nutrition-macro">
-            <div class="nutrition-macro-label">Ballaststoffe</div>
-            <div class="nutrition-macro-value">${macros.fiber}g</div>
-          </div>
-
-          <div class="nutrition-macro">
-            <div class="nutrition-macro-label">Salz</div>
-            <div class="nutrition-macro-value">${macros.salt}g</div>
-          </div>
+        <div class="nutrition-details-row">
+          <span>davon gesättigt <strong>${macros.satFat}g</strong></span>
+          <span>davon Zucker <strong>${macros.sugar}g</strong></span>
+          <span>Ballaststoffe <strong>${macros.fiber}g</strong></span>
+          <span>Salz <strong>${macros.salt}g</strong></span>
         </div>
       </div>
     `;

@@ -2225,12 +2225,20 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 .nutrition-category-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--space-sm);
   margin-bottom: var(--space-sm);
 }
 .nutrition-category-header h3 {
   margin-bottom: 0;
   font-size: var(--text-base);
+  flex: 1;
+  min-width: 0;
+}
+.nutrition-category-total {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-2);
+  white-space: nowrap;
 }
 .nutrition-category-add {
   width: 32px; height: 32px;

@@ -3764,33 +3764,46 @@ function updateNutritionLogItems() {
   }
 }
 
+/** Berechnet die Nährwerte eines einzelnen Tages-Eintrags (Produkt in g oder Mahlzeit in %) */
+function computeEntryMacros(entry) {
+  const acc = emptyMacros();
+  if (entry.type === "product") {
+    const p = state.products[entry.itemId];
+    if (p) {
+      const mult = entry.amount / (p.serving || 100);
+      addProductMacros(acc, p, mult);
+    }
+  } else if (entry.type === "meal") {
+    const m = state.meals[entry.itemId];
+    if (m) {
+      const totals = computeMealMacros(m);
+      const mult = (entry.amount || 100) / 100; // amount = gegessener Anteil in %
+      acc.calories += totals.calories * mult;
+      acc.fat      += totals.fat * mult;
+      acc.satFat   += totals.satFat * mult;
+      acc.carbs    += totals.carbs * mult;
+      acc.sugar    += totals.sugar * mult;
+      acc.fiber    += totals.fiber * mult;
+      acc.protein  += totals.protein * mult;
+      acc.salt     += totals.salt * mult;
+    }
+  }
+  return roundMacros(acc);
+}
+
 function computeDayMacros(entries) {
   const acc = emptyMacros();
-
   entries.forEach(entry => {
-    if (entry.type === "product") {
-      const p = state.products[entry.itemId];
-      if (p) {
-        const mult = entry.amount / (p.serving || 100);
-        addProductMacros(acc, p, mult);
-      }
-    } else if (entry.type === "meal") {
-      const m = state.meals[entry.itemId];
-      if (m) {
-        const totals = computeMealMacros(m);
-        const mult = (entry.amount || 100) / 100; // amount = gegessener Anteil in %
-        acc.calories += totals.calories * mult;
-        acc.fat      += totals.fat * mult;
-        acc.satFat   += totals.satFat * mult;
-        acc.carbs    += totals.carbs * mult;
-        acc.sugar    += totals.sugar * mult;
-        acc.fiber    += totals.fiber * mult;
-        acc.protein  += totals.protein * mult;
-        acc.salt     += totals.salt * mult;
-      }
-    }
+    const m = computeEntryMacros(entry);
+    acc.calories += m.calories;
+    acc.fat      += m.fat;
+    acc.satFat   += m.satFat;
+    acc.carbs    += m.carbs;
+    acc.sugar    += m.sugar;
+    acc.fiber    += m.fiber;
+    acc.protein  += m.protein;
+    acc.salt     += m.salt;
   });
-
   return roundMacros(acc);
 }
 
@@ -3833,23 +3846,33 @@ function renderNutritionToday() {
   // Einträge pro Kategorie rendern (unkategorisierte ältere Einträge landen unter "Snacks")
   NUTRITION_CATEGORIES.forEach(cat => {
     const listEl = document.getElementById(`nutrition-entries-${cat.id}`);
+    const totalEl = document.getElementById(`nutrition-category-total-${cat.id}`);
     if (!listEl) return;
     const catEntries = entries.filter(e => (e.category || "snacks") === cat.id);
+    let catCalories = 0;
 
-    listEl.innerHTML = catEntries.map(e => `
+    listEl.innerHTML = catEntries.map(e => {
+      const entryMacros = computeEntryMacros(e);
+      catCalories += entryMacros.calories;
+      return `
       <li class="nutrition-entry-item">
         <div class="nutrition-entry-info">
           <div class="nutrition-entry-name">${escHtml(entryItemName(e))}</div>
-          <div class="nutrition-entry-amount text-sm text-gray">${e.amount}${e.type === "meal" ? "%" : "g"}</div>
+          <div class="nutrition-entry-amount text-sm text-gray">${e.amount}${e.type === "meal" ? "%" : "g"} · ${entryMacros.calories} kcal</div>
         </div>
         <button class="icon-btn delete-btn" onclick="deleteNutritionEntry('${e.id}')" aria-label="Löschen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </button>
       </li>
-    `).join("");
+    `;
+    }).join("");
 
     if (catEntries.length === 0) {
       listEl.innerHTML = '<li class="empty-state">Noch nichts eingetragen.</li>';
+    }
+
+    if (totalEl) {
+      totalEl.textContent = catEntries.length > 0 ? `${Math.round(catCalories)} kcal` : "";
     }
   });
 

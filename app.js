@@ -2271,6 +2271,64 @@ function renderWeeklyReview() {
     </div>
   `;
 
+  // ── Kalorienaufnahme der Woche ──
+  const weekDates = [];
+  { let d = new Date(range.startStr + "T00:00:00"); for (let i = 0; i < 7; i++) { weekDates.push(toDateString(d)); d.setDate(d.getDate() + 1); } }
+
+  const weekDayMacros = weekDates.map(d => ({
+    date: d,
+    entries: state.nutritionEntries[d] || [],
+    macros: computeDayMacros(state.nutritionEntries[d] || [])
+  }));
+  const loggedDays = weekDayMacros.filter(d => d.entries.length > 0);
+
+  const avgKcal    = loggedDays.length ? Math.round(loggedDays.reduce((s, d) => s + d.macros.calories, 0) / loggedDays.length) : null;
+  const avgProtein = loggedDays.length ? Math.round(loggedDays.reduce((s, d) => s + d.macros.protein, 0) / loggedDays.length) : null;
+  const avgCarbs   = loggedDays.length ? Math.round(loggedDays.reduce((s, d) => s + d.macros.carbs, 0) / loggedDays.length) : null;
+  const avgFat     = loggedDays.length ? Math.round(loggedDays.reduce((s, d) => s + d.macros.fat, 0) / loggedDays.length) : null;
+
+  document.getElementById("weekly-nutrition-stats").innerHTML = `
+    <div class="stat-card">
+      <div class="stat-card-label">🔥 Ø Kalorien</div>
+      <div class="stat-card-value">${avgKcal !== null ? avgKcal : "–"}<span class="unit">kcal</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">🥩 Ø Protein</div>
+      <div class="stat-card-value">${avgProtein !== null ? avgProtein : "–"}<span class="unit">g</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">🍞 Ø Kohlenhydrate</div>
+      <div class="stat-card-value">${avgCarbs !== null ? avgCarbs : "–"}<span class="unit">g</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">🥑 Ø Fett</div>
+      <div class="stat-card-value">${avgFat !== null ? avgFat : "–"}<span class="unit">g</span></div>
+    </div>
+    <div class="stat-card full-width">
+      <div class="stat-card-label">📅 Getrackte Tage</div>
+      <div class="stat-card-value">${loggedDays.length} / 7</div>
+    </div>
+  `;
+
+  const WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+  const nutritionBreakdown = document.getElementById("weekly-nutrition-breakdown");
+  if (!loggedDays.length) {
+    nutritionBreakdown.innerHTML = `<li class="empty-state">Keine Ernährungs-Einträge in dieser Woche.</li>`;
+  } else {
+    nutritionBreakdown.innerHTML = weekDayMacros.map((d, i) => {
+      if (!d.entries.length) return "";
+      const goalPct = Math.round((d.macros.calories / state.nutritionGoals.calories) * 100);
+      return `
+        <li class="history-item">
+          <span class="history-date">${WEEKDAY_LABELS[i]} · ${d.date.slice(8, 10)}.${d.date.slice(5, 7)}.</span>
+          <div class="history-values">
+            <span class="history-sleep">${goalPct}% vom Ziel</span>
+            <span class="history-weight">${d.macros.calories} kcal</span>
+          </div>
+        </li>`;
+    }).join("");
+  }
+
   // ── Erledigte Aufgaben der Woche ──
   const completedTodos = toArray(state.todos).filter(td =>
     td.done && td.completedAt && td.completedAt >= range.startMs && td.completedAt <= range.endMs
@@ -3476,14 +3534,14 @@ function renderNutritionProducts() {
   const products = sortByName(toArray(state.products));
   container.innerHTML = products.map(p => `
     <div class="nutrition-product-item">
+      <div class="nutrition-product-avatar">🥣</div>
       <div class="nutrition-product-info">
         <div class="nutrition-product-name">${escHtml(p.name)}</div>
         <div class="nutrition-product-macros">
-          <span>${p.calories} kcal</span> · 
-          <span>F: ${p.fat}g</span> · 
-          <span>K: ${p.carbs}g</span> · 
-          <span>P: ${p.protein}g</span> · 
-          <span>Salz: ${p.salt || 0}g</span>
+          <span class="macro-chip macro-chip-kcal">${p.calories} kcal</span>
+          <span class="macro-chip" style="--chip-color: var(--warning)">F ${p.fat}g</span>
+          <span class="macro-chip" style="--chip-color: var(--success)">K ${p.carbs}g</span>
+          <span class="macro-chip" style="--chip-color: var(--prio-high)">P ${p.protein}g</span>
         </div>
         <div class="nutrition-product-serving">${p.serving}g pro Portion</div>
       </div>
@@ -3504,6 +3562,7 @@ function renderNutritionProducts() {
 }
 
 // ── MAHLZEITEN/GERICHTE ──
+
 
 async function createMeal() {
   const name = document.getElementById("meal-name-input").value.trim();
@@ -3619,13 +3678,14 @@ function renderNutritionMeals() {
     const totals = computeMealMacros(m);
     return `
       <div class="nutrition-meal-item">
+        <div class="nutrition-product-avatar nutrition-meal-avatar">🍽️</div>
         <div class="nutrition-meal-info">
           <div class="nutrition-meal-name">${escHtml(m.name)}</div>
           <div class="nutrition-meal-macros">
-            <span>${totals.calories} kcal</span> · 
-            <span>P: ${totals.protein}g</span> · 
-            <span>K: ${totals.carbs}g</span> · 
-            <span>F: ${totals.fat}g</span>
+            <span class="macro-chip macro-chip-kcal">${totals.calories} kcal</span>
+            <span class="macro-chip" style="--chip-color: var(--warning)">F ${totals.fat}g</span>
+            <span class="macro-chip" style="--chip-color: var(--success)">K ${totals.carbs}g</span>
+            <span class="macro-chip" style="--chip-color: var(--prio-high)">P ${totals.protein}g</span>
           </div>
           <div class="nutrition-meal-items text-sm text-gray">${(m.items || []).length} Produkte</div>
         </div>
@@ -3856,10 +3916,12 @@ function renderNutritionToday() {
       catCalories += entryMacros.calories;
       return `
       <li class="nutrition-entry-item">
+        <span class="nutrition-entry-type-icon">${e.type === "meal" ? "🍽️" : "🥣"}</span>
         <div class="nutrition-entry-info">
           <div class="nutrition-entry-name">${escHtml(entryItemName(e))}</div>
-          <div class="nutrition-entry-amount text-sm text-gray">${e.amount}${e.type === "meal" ? "%" : "g"} · ${entryMacros.calories} kcal</div>
+          <div class="nutrition-entry-amount text-sm text-gray">${e.amount}${e.type === "meal" ? "%" : "g"}</div>
         </div>
+        <span class="nutrition-entry-kcal">${entryMacros.calories} <small>kcal</small></span>
         <button class="icon-btn delete-btn" onclick="deleteNutritionEntry('${e.id}')" aria-label="Löschen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </button>
@@ -3925,8 +3987,13 @@ window.deleteNutritionEntry = deleteNutritionEntry;
 
 function renderNutritionDateLabel() {
   const el = document.getElementById("nutrition-date");
+  const weekdayEl = document.getElementById("nutrition-weekday");
   if (!el) return;
   el.textContent = state.selectedDate === today() ? "Heute" : formatDate(state.selectedDate);
+  if (weekdayEl) {
+    const d = new Date(state.selectedDate + "T00:00:00");
+    weekdayEl.textContent = d.toLocaleString("de-DE", { weekday: "long" });
+  }
 }
 
 document.getElementById("nutrition-prev-day").addEventListener("click", () => {

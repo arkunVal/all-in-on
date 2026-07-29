@@ -241,11 +241,14 @@
         
         <!-- Datum-Navigation -->
         <div class="nutrition-header">
-          <button id="nutrition-prev-day" class="icon-btn" aria-label="Vorheriger Tag">
+          <button id="nutrition-prev-day" class="icon-btn nutrition-date-arrow" aria-label="Vorheriger Tag">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          <div class="nutrition-date" id="nutrition-date">Heute</div>
-          <button id="nutrition-next-day" class="icon-btn" aria-label="Nächster Tag">
+          <div class="nutrition-date-badge">
+            <span class="nutrition-date-weekday" id="nutrition-weekday"></span>
+            <span class="nutrition-date" id="nutrition-date">Heute</span>
+          </div>
+          <button id="nutrition-next-day" class="icon-btn nutrition-date-arrow" aria-label="Nächster Tag">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
@@ -254,11 +257,14 @@
         <div id="nutrition-summary-today"></div>
 
         <!-- Heutige Einträge, nach Mahlzeit-Kategorie -->
-        <div class="nutrition-section nutrition-category-section" data-category="breakfast">
+        <div class="nutrition-category-card" data-category="breakfast" style="--cat-color: var(--warning);">
           <div class="nutrition-category-header">
-            <h3>🌅 Frühstück</h3>
-            <span class="nutrition-category-total" id="nutrition-category-total-breakfast"></span>
-            <button class="icon-btn nutrition-category-add" data-category="breakfast" aria-label="Zum Frühstück hinzufügen">
+            <span class="nutrition-category-icon">🌅</span>
+            <div class="nutrition-category-heading">
+              <h3>Frühstück</h3>
+              <span class="nutrition-category-total" id="nutrition-category-total-breakfast"></span>
+            </div>
+            <button class="nutrition-category-add" data-category="breakfast" aria-label="Zum Frühstück hinzufügen">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
           </div>
@@ -267,11 +273,14 @@
           </ul>
         </div>
 
-        <div class="nutrition-section nutrition-category-section" data-category="lunch">
+        <div class="nutrition-category-card" data-category="lunch" style="--cat-color: var(--accent);">
           <div class="nutrition-category-header">
-            <h3>🍽️ Mittagessen</h3>
-            <span class="nutrition-category-total" id="nutrition-category-total-lunch"></span>
-            <button class="icon-btn nutrition-category-add" data-category="lunch" aria-label="Zum Mittagessen hinzufügen">
+            <span class="nutrition-category-icon">🍽️</span>
+            <div class="nutrition-category-heading">
+              <h3>Mittagessen</h3>
+              <span class="nutrition-category-total" id="nutrition-category-total-lunch"></span>
+            </div>
+            <button class="nutrition-category-add" data-category="lunch" aria-label="Zum Mittagessen hinzufügen">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
           </div>
@@ -280,11 +289,14 @@
           </ul>
         </div>
 
-        <div class="nutrition-section nutrition-category-section" data-category="dinner">
+        <div class="nutrition-category-card" data-category="dinner" style="--cat-color: var(--prio-high);">
           <div class="nutrition-category-header">
-            <h3>🌙 Abendessen</h3>
-            <span class="nutrition-category-total" id="nutrition-category-total-dinner"></span>
-            <button class="icon-btn nutrition-category-add" data-category="dinner" aria-label="Zum Abendessen hinzufügen">
+            <span class="nutrition-category-icon">🌙</span>
+            <div class="nutrition-category-heading">
+              <h3>Abendessen</h3>
+              <span class="nutrition-category-total" id="nutrition-category-total-dinner"></span>
+            </div>
+            <button class="nutrition-category-add" data-category="dinner" aria-label="Zum Abendessen hinzufügen">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
           </div>
@@ -293,11 +305,14 @@
           </ul>
         </div>
 
-        <div class="nutrition-section nutrition-category-section" data-category="snacks">
+        <div class="nutrition-category-card" data-category="snacks" style="--cat-color: var(--success);">
           <div class="nutrition-category-header">
-            <h3>🍎 Snacks</h3>
-            <span class="nutrition-category-total" id="nutrition-category-total-snacks"></span>
-            <button class="icon-btn nutrition-category-add" data-category="snacks" aria-label="Zu Snacks hinzufügen">
+            <span class="nutrition-category-icon">🍎</span>
+            <div class="nutrition-category-heading">
+              <h3>Snacks</h3>
+              <span class="nutrition-category-total" id="nutrition-category-total-snacks"></span>
+            </div>
+            <button class="nutrition-category-add" data-category="snacks" aria-label="Zu Snacks hinzufügen">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
           </div>
@@ -307,22 +322,31 @@
         </div>
 
         <!-- Produkte & Mahlzeiten Management -->
-        <div class="nutrition-section">
-          <h3>Produkte</h3>
+        <div class="nutrition-library">
+          <div class="nutrition-library-title">
+            <span class="nutrition-library-icon">📦</span>
+            <h3>Meine Datenbank</h3>
+          </div>
           <div class="nutrition-tabs">
             <button class="tab-btn active" data-tab="products">Produkte</button>
             <button class="tab-btn" data-tab="meals">Mahlzeiten</button>
           </div>
 
           <div class="tab-content active" id="tab-products">
-            <button class="btn btn-primary" id="nutrition-add-product-btn" style="width: 100%; margin-bottom: 1rem;">+ Neues Produkt</button>
+            <button class="btn btn-primary nutrition-add-btn" id="nutrition-add-product-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Neues Produkt
+            </button>
             <div id="nutrition-products-list" class="nutrition-products-list">
               <p class="empty-state">Keine Produkte vorhanden.</p>
             </div>
           </div>
 
           <div class="tab-content" id="tab-meals">
-            <button class="btn btn-primary" id="nutrition-add-meal-btn" style="width: 100%; margin-bottom: 1rem;">+ Neue Mahlzeit</button>
+            <button class="btn btn-primary nutrition-add-btn" id="nutrition-add-meal-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Neue Mahlzeit
+            </button>
             <div id="nutrition-meals-list" class="nutrition-meals-list">
               <p class="empty-state">Keine Mahlzeiten vorhanden.</p>
             </div>
@@ -731,6 +755,12 @@
         <span class="section-title">Flüssigkeit &amp; Koffein (Ø pro Tag)</span>
       </div>
       <div class="today-stats-grid" id="weekly-intake-stats"></div>
+
+      <div class="section-header" style="margin-top: var(--space-lg)">
+        <span class="section-title">Ernährung (Ø pro Tag)</span>
+      </div>
+      <div class="today-stats-grid" id="weekly-nutrition-stats"></div>
+      <ul class="history-list" id="weekly-nutrition-breakdown"></ul>
 
       <div class="section-header" style="margin-top: var(--space-lg)">
         <span class="section-title">Erledigte Aufgaben</span>

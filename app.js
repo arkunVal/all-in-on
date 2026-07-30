@@ -790,14 +790,16 @@ function initListeners() {
     state.products = snap.exists() ? snap.val() : {};
     renderNutritionProducts();
     renderMealProductSelector();
-    updateNutritionLogItems();
+    const searchInput = document.getElementById("nutrition-log-search");
+    if (searchInput) renderNutritionLogResults(searchInput.value);
     renderNutritionToday();
   });
 
   onValue(REFS.meals(), snap => {
     state.meals = snap.exists() ? snap.val() : {};
     renderNutritionMeals();
-    updateNutritionLogItems();
+    const searchInput = document.getElementById("nutrition-log-search");
+    if (searchInput) renderNutritionLogResults(searchInput.value);
     renderNutritionToday();
   });
 
@@ -3781,6 +3783,9 @@ function clearNutritionLogInputs() {
   document.getElementById("nutrition-log-type").value = "product";
   document.getElementById("nutrition-log-item").value = "";
   document.getElementById("nutrition-log-amount").value = "";
+  document.getElementById("nutrition-log-search").value = "";
+  showNutritionLogSearch();
+  updateNutritionLogAmountFields();
 }
 
 async function deleteNutritionEntry(entryId) {
@@ -3799,29 +3804,81 @@ const NUTRITION_CATEGORIES = [
   { id: "snacks",    label: "🍎 Snacks" }
 ];
 
-function updateNutritionLogItems() {
+/** Passt Label/Placeholder des Mengenfelds an den Typ an (Produkt=Gramm, Mahlzeit=Prozent) */
+function updateNutritionLogAmountFields() {
   const type = document.getElementById("nutrition-log-type").value;
-  const select = document.getElementById("nutrition-log-item");
   const amountInput = document.getElementById("nutrition-log-amount");
   const amountLabel = document.getElementById("nutrition-log-amount-label");
   const amountHint = document.getElementById("nutrition-log-amount-hint");
-  
+
   if (type === "product") {
-    const products = sortByName(toArray(state.products));
-    select.innerHTML = products.map(p => `<option value="${p.id}">${escHtml(p.name)} (${p.serving}g)</option>`).join("");
     amountLabel.textContent = "Menge (g)";
     amountInput.placeholder = "100";
     amountInput.removeAttribute("max");
     amountHint.style.display = "none";
   } else {
-    const meals = sortByName(toArray(state.meals));
-    select.innerHTML = meals.map(m => `<option value="${m.id}">${escHtml(m.name)}</option>`).join("");
     amountLabel.textContent = "Anteil (%)";
     amountInput.placeholder = "100";
-    amountInput.value = "100";
+    amountInput.value = amountInput.value || "100";
     amountInput.max = "500";
     amountHint.style.display = "block";
   }
+}
+
+/** Liefert die aktuell wählbaren Einträge (Produkte oder Mahlzeiten), alphabetisch sortiert */
+function nutritionLogItemsSource() {
+  const type = document.getElementById("nutrition-log-type").value;
+  return type === "product" ? sortByName(toArray(state.products)) : sortByName(toArray(state.meals));
+}
+
+/** Rendert die gefilterte, klickbare Ergebnisliste im Log-Modal */
+function renderNutritionLogResults(query) {
+  const container = document.getElementById("nutrition-log-results");
+  const type = document.getElementById("nutrition-log-type").value;
+  const q = (query || "").trim().toLowerCase();
+  const items = nutritionLogItemsSource().filter(i => i.name.toLowerCase().includes(q));
+
+  if (items.length === 0) {
+    container.innerHTML = `<p class="empty-state">Nichts gefunden.</p>`;
+    return;
+  }
+
+  container.innerHTML = items.map(i => {
+    const sub = type === "product" ? `${i.calories} kcal · ${i.serving}g` : `${computeMealMacros(i).calories} kcal`;
+    return `
+      <button type="button" class="nutrition-log-result-item" data-id="${i.id}" data-name="${escHtml(i.name)}">
+        <span class="nutrition-log-result-icon">${type === "product" ? "🥣" : "🍽️"}</span>
+        <span class="nutrition-log-result-text">
+          <span class="nutrition-log-result-name">${escHtml(i.name)}</span>
+          <span class="nutrition-log-result-sub">${sub}</span>
+        </span>
+      </button>
+    `;
+  }).join("");
+
+  container.querySelectorAll(".nutrition-log-result-item").forEach(btn => {
+    btn.addEventListener("click", () => selectNutritionLogItem(btn.dataset.id, btn.dataset.name));
+  });
+}
+
+function selectNutritionLogItem(id, name) {
+  document.getElementById("nutrition-log-item").value = id;
+  document.getElementById("nutrition-log-selected-name").textContent = name;
+  document.getElementById("nutrition-log-selected-icon").textContent =
+    document.getElementById("nutrition-log-type").value === "product" ? "🥣" : "🍽️";
+  document.getElementById("nutrition-log-selected").style.display = "flex";
+  document.getElementById("nutrition-log-search-wrap").style.display = "none";
+  document.getElementById("nutrition-log-amount-group").style.display = "block";
+  document.getElementById("nutrition-log-amount").focus();
+}
+
+function showNutritionLogSearch() {
+  document.getElementById("nutrition-log-item").value = "";
+  document.getElementById("nutrition-log-selected").style.display = "none";
+  document.getElementById("nutrition-log-search-wrap").style.display = "block";
+  document.getElementById("nutrition-log-amount-group").style.display = "none";
+  document.getElementById("nutrition-log-search").value = "";
+  renderNutritionLogResults("");
 }
 
 /** Berechnet die Nährwerte eines einzelnen Tages-Eintrags (Produkt in g oder Mahlzeit in %) */
@@ -3907,13 +3964,17 @@ function renderNutritionToday() {
   NUTRITION_CATEGORIES.forEach(cat => {
     const listEl = document.getElementById(`nutrition-entries-${cat.id}`);
     const totalEl = document.getElementById(`nutrition-category-total-${cat.id}`);
+    const macrosEl = document.getElementById(`nutrition-category-macros-${cat.id}`);
     if (!listEl) return;
     const catEntries = entries.filter(e => (e.category || "snacks") === cat.id);
-    let catCalories = 0;
+    const catAcc = emptyMacros();
 
     listEl.innerHTML = catEntries.map(e => {
       const entryMacros = computeEntryMacros(e);
-      catCalories += entryMacros.calories;
+      catAcc.calories += entryMacros.calories;
+      catAcc.protein  += entryMacros.protein;
+      catAcc.carbs    += entryMacros.carbs;
+      catAcc.fat      += entryMacros.fat;
       return `
       <li class="nutrition-entry-item">
         <span class="nutrition-entry-type-icon">${e.type === "meal" ? "🍽️" : "🥣"}</span>
@@ -3933,8 +3994,18 @@ function renderNutritionToday() {
       listEl.innerHTML = '<li class="empty-state">Noch nichts eingetragen.</li>';
     }
 
+    const catTotals = roundMacros(catAcc);
+
     if (totalEl) {
-      totalEl.textContent = catEntries.length > 0 ? `${Math.round(catCalories)} kcal` : "";
+      totalEl.textContent = catEntries.length > 0 ? `${catTotals.calories} kcal` : "";
+    }
+
+    if (macrosEl) {
+      macrosEl.innerHTML = catEntries.length > 0 ? `
+        <span class="macro-chip" style="--chip-color: var(--prio-high)">P ${catTotals.protein}g</span>
+        <span class="macro-chip" style="--chip-color: var(--success)">K ${catTotals.carbs}g</span>
+        <span class="macro-chip" style="--chip-color: var(--warning)">F ${catTotals.fat}g</span>
+      ` : "";
     }
   });
 
@@ -4068,7 +4139,6 @@ document.getElementById("meal-product-search").addEventListener("input", (e) => 
 function openNutritionLogModal(category) {
   clearNutritionLogInputs();
   document.getElementById("nutrition-log-category").value = category || "breakfast";
-  updateNutritionLogItems();
   openModal("modal-nutrition-log");
 }
 
@@ -4076,7 +4146,14 @@ document.querySelectorAll(".nutrition-category-add").forEach(btn => {
   btn.addEventListener("click", () => openNutritionLogModal(btn.dataset.category));
 });
 
-document.getElementById("nutrition-log-type").addEventListener("change", updateNutritionLogItems);
+document.getElementById("nutrition-log-type").addEventListener("change", () => {
+  showNutritionLogSearch();
+  updateNutritionLogAmountFields();
+});
+document.getElementById("nutrition-log-search").addEventListener("input", (e) => {
+  renderNutritionLogResults(e.target.value);
+});
+document.getElementById("nutrition-log-change-btn").addEventListener("click", showNutritionLogSearch);
 document.getElementById("cancel-nutrition-log-btn").addEventListener("click", () => closeModal("modal-nutrition-log"));
 document.getElementById("save-nutrition-log-btn").addEventListener("click", logNutritionEntry);
 

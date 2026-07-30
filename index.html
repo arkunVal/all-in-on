@@ -268,6 +268,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
           </div>
+          <div class="nutrition-category-macros" id="nutrition-category-macros-breakfast"></div>
           <ul id="nutrition-entries-breakfast" class="nutrition-entries-list">
             <li class="empty-state">Noch nichts eingetragen.</li>
           </ul>
@@ -284,6 +285,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
           </div>
+          <div class="nutrition-category-macros" id="nutrition-category-macros-lunch"></div>
           <ul id="nutrition-entries-lunch" class="nutrition-entries-list">
             <li class="empty-state">Noch nichts eingetragen.</li>
           </ul>
@@ -300,6 +302,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
           </div>
+          <div class="nutrition-category-macros" id="nutrition-category-macros-dinner"></div>
           <ul id="nutrition-entries-dinner" class="nutrition-entries-list">
             <li class="empty-state">Noch nichts eingetragen.</li>
           </ul>
@@ -316,6 +319,7 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
           </div>
+          <div class="nutrition-category-macros" id="nutrition-category-macros-snacks"></div>
           <ul id="nutrition-entries-snacks" class="nutrition-entries-list">
             <li class="empty-state">Noch nichts eingetragen.</li>
           </ul>
@@ -1230,10 +1234,22 @@
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label" for="nutrition-log-item">Auswahl</label>
-        <select class="form-input form-select" id="nutrition-log-item"></select>
+        <label class="form-label" for="nutrition-log-search">Auswahl</label>
+
+        <div id="nutrition-log-selected" class="nutrition-log-selected" style="display:none;">
+          <span class="nutrition-log-selected-icon" id="nutrition-log-selected-icon">🥣</span>
+          <span class="nutrition-log-selected-name" id="nutrition-log-selected-name"></span>
+          <button type="button" class="nutrition-log-selected-change" id="nutrition-log-change-btn">Ändern</button>
+        </div>
+
+        <div id="nutrition-log-search-wrap">
+          <input class="form-input" id="nutrition-log-search" type="text" placeholder="Suchen…" autocomplete="off" />
+          <div id="nutrition-log-results" class="nutrition-log-results"></div>
+        </div>
+
+        <input type="hidden" id="nutrition-log-item" value="" />
       </div>
-      <div class="form-group" id="nutrition-log-amount-group">
+      <div class="form-group" id="nutrition-log-amount-group" style="display:none;">
         <label class="form-label" id="nutrition-log-amount-label" for="nutrition-log-amount">Menge (g)</label>
         <input class="form-input" id="nutrition-log-amount" type="number" placeholder="100" min="1" />
         <p class="form-hint" id="nutrition-log-amount-hint" style="display:none;">Wie viel Prozent der Mahlzeit hast du gegessen? (z.B. 50 = die Hälfte)</p>

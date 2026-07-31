@@ -3925,13 +3925,14 @@ function computeDayMacros(entries) {
 }
 
 // ── Helfer: eine "Noch offen"-Zeile für ein Makro (Protein/Kohlenhydrate/Fett) ──
-function nutritionRemainingRowHtml(label, colorVar, consumed, goal) {
+function nutritionRemainingRowHtml(label, colorVar, consumed, goal, warnOnOver = true) {
   const pct = Math.min(100, Math.round((consumed / goal) * 100));
   const remaining = Math.round((goal - consumed) * 10) / 10;
   const over = remaining < 0;
-  const barColor = over ? "var(--danger)" : colorVar;
+  const isWarning = over && warnOnOver;
+  const barColor = isWarning ? "var(--danger)" : colorVar;
   const valueHtml = over
-    ? `<span class="nutrition-remaining-over">+${Math.abs(remaining)}g über</span>`
+    ? `<span class="${isWarning ? "nutrition-remaining-over" : "nutrition-remaining-over-neutral"}">+${Math.abs(remaining)}g über</span>`
     : `<span class="nutrition-remaining-num">${remaining}g</span> <span class="nutrition-remaining-suffix">offen</span>`;
 
   return `
@@ -4030,9 +4031,9 @@ function renderNutritionToday() {
         <div class="nutrition-ring-sub">${macros.calories} von ${goals.calories} kcal gegessen</div>
 
         <div class="nutrition-remaining-grid">
-          ${nutritionRemainingRowHtml("Protein", "var(--prio-high)", macros.protein, goals.protein)}
-          ${nutritionRemainingRowHtml("Kohlenhydrate", "var(--success)", macros.carbs, goals.carbs)}
-          ${nutritionRemainingRowHtml("Fett", "var(--warning)", macros.fat, goals.fat)}
+          ${nutritionRemainingRowHtml("Protein", "var(--prio-high)", macros.protein, goals.protein, false)}
+          ${nutritionRemainingRowHtml("Kohlenhydrate", "var(--success)", macros.carbs, goals.carbs, false)}
+          ${nutritionRemainingRowHtml("Fett", "var(--warning)", macros.fat, goals.fat, true)}
         </div>
 
         <div class="nutrition-details-row">
@@ -4089,7 +4090,7 @@ document.querySelectorAll(".nutrition-tabs .tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".nutrition-tabs .tab-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
-    document.querySelectorAll(".nutrition-section .tab-content").forEach(c => c.classList.remove("active"));
+    document.querySelectorAll(".nutrition-library .tab-content").forEach(c => c.classList.remove("active"));
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
   });
 });

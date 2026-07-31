@@ -2189,6 +2189,11 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
   font-weight: 700;
   color: var(--danger);
 }
+.nutrition-remaining-over-neutral {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-1);
+}
 .nutrition-remaining-bar {
   height: 5px;
   border-radius: var(--radius-full);

@@ -2382,7 +2382,7 @@ const SHARE_STAT_DEFS = [
   { id: "avgWater",       icon: "💧", label: "Ø Flüssigkeit" },
   { id: "avgCaffeine",    icon: "☕", label: "Ø Koffein" }
 ];
-const SHARE_STAT_DEFAULT_CONFIG = ["trainingTime", "workoutCount", "distance", "streak", "completedTodos", "avgCalories"];
+const SHARE_STAT_DEFAULT_CONFIG = ["trainingTime", "workoutCount", "distance", "streak", "completedTodos"];
 
 /** Berechnet die Werte aller verfügbaren Stats für die gewählte Woche */
 function computeShareStatPool(range) {
@@ -2436,8 +2436,8 @@ function computeShareStatPool(range) {
 
 function getShareCardConfig() {
   const cfg = state.settings.shareCardConfig;
-  if (Array.isArray(cfg) && cfg.length === 6) return cfg;
-  return SHARE_STAT_DEFAULT_CONFIG.concat([null]).slice(0, 6);
+  if (Array.isArray(cfg) && cfg.length === 5) return cfg;
+  return SHARE_STAT_DEFAULT_CONFIG.slice(0, 5);
 }
 
 function renderShareConfigUI() {

@@ -115,7 +115,7 @@
 
         <!-- Termine des gewählten Tages -->
         <div class="section-header">
-          <span class="section-title" id="day-events-title">Heute</span>
+          <span class="section-icon" style="--icon-color:var(--accent)">📅</span><span class="section-title" id="day-events-title">Heute</span>
           <button class="text-btn" id="add-event-btn">+ Termin</button>
         </div>
         <ul class="event-list" id="day-event-list">
@@ -124,7 +124,7 @@
 
         <!-- Aufgaben heute -->
         <div class="section-header">
-          <span class="section-title">Aufgaben heute</span>
+          <span class="section-icon" style="--icon-color:var(--success)">✅</span><span class="section-title">Aufgaben heute</span>
         </div>
         <ul class="todo-list" id="today-todo-list">
           <li class="empty-state">Keine Aufgaben für heute.</li>
@@ -178,7 +178,7 @@
 
         <!-- Heutiger Status -->
         <div class="section-header">
-          <span class="section-title">Heute</span>
+          <span class="section-icon" style="--icon-color:var(--warning)">📊</span><span class="section-title">Heute</span>
           <button class="text-btn" id="edit-today-checkin-btn">Bearbeiten</button>
         </div>
         <div class="today-stats-grid" id="today-stats-grid"></div>
@@ -186,7 +186,7 @@
 
         <!-- Trainings (Punkt 3) -->
         <div class="section-header">
-          <span class="section-title">Trainings</span>
+          <span class="section-icon" style="--icon-color:var(--warning)">🏋️</span><span class="section-title">Trainings</span>
           <button class="text-btn" id="add-workout-btn">+ Training</button>
         </div>
 
@@ -206,7 +206,7 @@
 
         <!-- Verletzungen / Krankheit -->
         <div class="section-header">
-          <span class="section-title">Verletzungen &amp; Krankheit</span>
+          <span class="section-icon" style="--icon-color:var(--danger)">🩹</span><span class="section-title">Verletzungen &amp; Krankheit</span>
           <button class="text-btn" id="add-injury-btn">+ Eintrag</button>
         </div>
         <ul class="injury-list" id="injury-list">
@@ -215,7 +215,7 @@
 
         <!-- Gewicht & Schlaf Verlauf (Punkt 3: Diagramm) -->
         <div class="section-header">
-          <span class="section-title">Gewicht &amp; Schlaf</span>
+          <span class="section-icon" style="--icon-color:var(--accent-light)">⚖️</span><span class="section-title">Gewicht &amp; Schlaf</span>
         </div>
         <div class="chart-card" id="progress-chart-card">
           <div class="chart-legend">
@@ -631,9 +631,9 @@
         </button>
       </div>
       <div class="project-detail-content" id="project-detail-content">
-        <div class="section-header"><span class="section-title">To-Dos</span></div>
+        <div class="section-header"><span class="section-icon" style="--icon-color:var(--success)">✅</span><span class="section-title">To-Dos</span></div>
         <ul class="todo-list" id="project-todo-list"></ul>
-        <div class="section-header"><span class="section-title">Notizen</span></div>
+        <div class="section-header"><span class="section-icon" style="--icon-color:var(--warning)">📝</span><span class="section-title">Notizen</span></div>
         <div class="notes-grid" id="project-notes-grid"></div>
       </div>
     </div>
@@ -704,7 +704,7 @@
       </div>
 
       <div class="section-header">
-        <span class="section-title">Schnellauswahl</span>
+        <span class="section-icon" style="--icon-color:var(--accent)">⚡</span><span class="section-title">Schnellauswahl</span>
       </div>
       <div class="intake-shortcut-grid" id="intake-shortcut-grid"></div>
 
@@ -750,24 +750,24 @@
       </div>
 
       <div class="section-header">
-        <span class="section-title">Training</span>
+        <span class="section-icon" style="--icon-color:var(--warning)">🏋️</span><span class="section-title">Training</span>
       </div>
       <div class="today-stats-grid" id="weekly-training-stats"></div>
       <ul class="history-list" id="weekly-sport-breakdown"></ul>
 
       <div class="section-header" style="margin-top: var(--space-lg)">
-        <span class="section-title">Flüssigkeit &amp; Koffein (Ø pro Tag)</span>
+        <span class="section-icon" style="--icon-color:var(--accent-light)">💧</span><span class="section-title">Flüssigkeit &amp; Koffein (Ø pro Tag)</span>
       </div>
       <div class="today-stats-grid" id="weekly-intake-stats"></div>
 
       <div class="section-header" style="margin-top: var(--space-lg)">
-        <span class="section-title">Ernährung (Ø pro Tag)</span>
+        <span class="section-icon" style="--icon-color:var(--prio-high)">🍽️</span><span class="section-title">Ernährung (Ø pro Tag)</span>
       </div>
       <div class="today-stats-grid" id="weekly-nutrition-stats"></div>
       <ul class="history-list" id="weekly-nutrition-breakdown"></ul>
 
       <div class="section-header" style="margin-top: var(--space-lg)">
-        <span class="section-title">Erledigte Aufgaben</span>
+        <span class="section-icon" style="--icon-color:var(--success)">✅</span><span class="section-title">Erledigte Aufgaben</span>
       </div>
       <div class="stat-card full-width" id="weekly-todo-count-card" style="margin-bottom: var(--space-md)"></div>
       <ul class="todo-list" id="weekly-completed-todos"></ul>
@@ -778,6 +778,10 @@
   <div id="modal-share-summary" class="modal-overlay" role="dialog" aria-modal="true">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
+      <h2 class="modal-title">Für Social Media</h2>
+
+      <p class="form-hint" style="margin-top:-4px;">Wähle, welcher Wert an welcher Stelle stehen soll.</p>
+      <div class="share-config-grid" id="share-config-grid"></div>
 
       <div class="share-card" id="share-card">
         <div class="share-card-glow"></div>
@@ -821,7 +825,7 @@
       <p class="account-email" id="account-email-display"></p>
 
       <div class="section-header">
-        <span class="section-title">Profil</span>
+        <span class="section-icon" style="--icon-color:var(--accent)">👤</span><span class="section-title">Profil</span>
       </div>
       <div class="form-group">
         <label class="form-label" for="profile-name">Name</label>
@@ -847,7 +851,7 @@
       </div>
 
       <div class="section-header" style="margin-top: var(--space-lg)">
-        <span class="section-title">Erscheinungsbild</span>
+        <span class="section-icon" style="--icon-color:var(--accent-light)">🎨</span><span class="section-title">Erscheinungsbild</span>
       </div>
       <div class="settings-card">
         <div class="settings-row-label">Akzentfarbe</div>
@@ -867,7 +871,7 @@
       </div>
 
       <div class="section-header" style="margin-top: var(--space-lg)">
-        <span class="section-title">Kalender</span>
+        <span class="section-icon" style="--icon-color:var(--accent)">🗓️</span><span class="section-title">Kalender</span>
       </div>
       <div class="settings-card">
         <button class="settings-row" id="settings-manage-calendars-btn">

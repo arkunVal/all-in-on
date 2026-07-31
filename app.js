@@ -2366,14 +2366,28 @@ document.getElementById("weekly-review-next").addEventListener("click", () => {
 // ═══════════════════════════════════════════════════════
 
 /** Baut eine reduzierte, screenshot-taugliche Zusammenfassung der aktuell gewählten Woche */
-function renderShareSummary() {
-  const range = getWeekRange(state.weeklyReviewOffset);
-  document.getElementById("share-range").textContent = range.label;
+// ── Punkt 2: Modulare Social-Media-Zusammenfassung — Nutzer wählt, welcher Wert wo steht ──
 
+const SHARE_STAT_DEFS = [
+  { id: "trainingTime",   icon: "⏱️", label: "Trainingszeit" },
+  { id: "workoutCount",   icon: "🏋️", label: "Trainings" },
+  { id: "distance",       icon: "📏", label: "Distanz" },
+  { id: "streak",         icon: "🔥", label: "Tage-Streak" },
+  { id: "completedTodos", icon: "✅", label: "Erledigt" },
+  { id: "avgCalories",    icon: "🍽️", label: "Ø Kalorien" },
+  { id: "avgProtein",     icon: "🥩", label: "Ø Protein" },
+  { id: "avgCarbs",       icon: "🍞", label: "Ø Kohlenhydrate" },
+  { id: "avgFat",         icon: "🥑", label: "Ø Fett" },
+  { id: "nutritionDays",  icon: "📅", label: "Ernährung getrackt" },
+  { id: "avgWater",       icon: "💧", label: "Ø Flüssigkeit" },
+  { id: "avgCaffeine",    icon: "☕", label: "Ø Koffein" }
+];
+const SHARE_STAT_DEFAULT_CONFIG = ["trainingTime", "workoutCount", "distance", "streak", "completedTodos", "avgCalories"];
+
+/** Berechnet die Werte aller verfügbaren Stats für die gewählte Woche */
+function computeShareStatPool(range) {
   const weekWorkouts = toArray(state.workouts).filter(w => w.date >= range.startStr && w.date <= range.endStr);
-
-  let totalMinutes = 0;
-  let totalDistanceKm = 0;
+  let totalMinutes = 0, totalDistanceKm = 0;
   weekWorkouts.forEach(w => {
     totalMinutes += (Number(w.durationHours) || 0) * 60 + (Number(w.durationMinutes) || 0) + (Number(w.durationSeconds) || 0) / 60;
     if (w.distance !== undefined && w.distance !== null) {
@@ -2387,30 +2401,99 @@ function renderShareSummary() {
     td.done && td.completedAt && td.completedAt >= range.startMs && td.completedAt <= range.endMs
   ).length;
 
+  const weekCheckinDates = Object.keys(state.checkins).filter(d => d >= range.startStr && d <= range.endStr);
+  const waterEntries = weekCheckinDates.map(d => state.checkins[d].water).filter(v => v !== undefined && v !== null);
+  const avgWater = waterEntries.length ? Math.round(waterEntries.reduce((a, b) => a + Number(b), 0) / waterEntries.length) : null;
+  const caffeineValues = weekCheckinDates.map(d => state.checkins[d].caffeine).filter(v => v !== undefined && v !== null);
+  const avgCaffeine = Math.round(caffeineValues.reduce((a, b) => a + Number(b), 0) / 7);
+
+  const weekDates = [];
+  { let d = new Date(range.startStr + "T00:00:00"); for (let i = 0; i < 7; i++) { weekDates.push(toDateString(d)); d.setDate(d.getDate() + 1); } }
+  const weekDayMacros = weekDates.map(d => ({ entries: state.nutritionEntries[d] || [], macros: computeDayMacros(state.nutritionEntries[d] || []) }));
+  const loggedDays = weekDayMacros.filter(d => d.entries.length > 0);
+  const avgKcal    = loggedDays.length ? Math.round(loggedDays.reduce((s, d) => s + d.macros.calories, 0) / loggedDays.length) : null;
+  const avgProtein = loggedDays.length ? Math.round(loggedDays.reduce((s, d) => s + d.macros.protein, 0) / loggedDays.length) : null;
+  const avgCarbs   = loggedDays.length ? Math.round(loggedDays.reduce((s, d) => s + d.macros.carbs, 0) / loggedDays.length) : null;
+  const avgFat     = loggedDays.length ? Math.round(loggedDays.reduce((s, d) => s + d.macros.fat, 0) / loggedDays.length) : null;
+
   const streak = calculateStreak();
 
-  const stats = [
-    { icon: "⏱️", value: totalMinutes > 0 ? `${totalH}h ${totalM}min` : "0h", label: "Trainingszeit" },
-    { icon: "🏋️", value: String(weekWorkouts.length), label: "Trainings" },
-    { icon: "📏", value: totalDistanceKm > 0 ? `${totalDistanceKm.toFixed(1)} km` : "–", label: "Distanz" },
-    { icon: "🔥", value: String(streak), label: "Tage-Streak" },
-    { icon: "✅", value: String(completedCount), label: "Erledigt" },
-  ];
+  return {
+    trainingTime:   totalMinutes > 0 ? `${totalH}h ${totalM}min` : "0h",
+    workoutCount:   String(weekWorkouts.length),
+    distance:       totalDistanceKm > 0 ? `${totalDistanceKm.toFixed(1)} km` : "–",
+    streak:         String(streak),
+    completedTodos: String(completedCount),
+    avgCalories:    avgKcal !== null ? `${avgKcal} kcal` : "–",
+    avgProtein:     avgProtein !== null ? `${avgProtein}g` : "–",
+    avgCarbs:       avgCarbs !== null ? `${avgCarbs}g` : "–",
+    avgFat:         avgFat !== null ? `${avgFat}g` : "–",
+    nutritionDays:  `${loggedDays.length}/7`,
+    avgWater:       avgWater !== null ? `${avgWater}ml` : "–",
+    avgCaffeine:    avgCaffeine > 0 ? `${avgCaffeine}mg` : "–"
+  };
+}
 
-  document.getElementById("share-stat-grid").innerHTML = stats.map((s, i) => `
-    <div class="share-stat ${i === 0 ? "share-stat-hero" : ""}">
-      <span class="share-stat-icon">${s.icon}</span>
-      <div class="share-stat-value">${s.value}</div>
-      <div class="share-stat-label">${s.label}</div>
+function getShareCardConfig() {
+  const cfg = state.settings.shareCardConfig;
+  if (Array.isArray(cfg) && cfg.length === 6) return cfg;
+  return SHARE_STAT_DEFAULT_CONFIG.concat([null]).slice(0, 6);
+}
+
+function renderShareConfigUI() {
+  const container = document.getElementById("share-config-grid");
+  const config = getShareCardConfig();
+  const options = `<option value="">— Leer —</option>` + SHARE_STAT_DEFS.map(s => `<option value="${s.id}">${s.icon} ${s.label}</option>`).join("");
+
+  container.innerHTML = config.map((val, i) => `
+    <div class="share-config-slot ${i === 0 ? "share-config-slot-hero" : ""}">
+      <label class="form-label">${i === 0 ? "Hauptfeld" : "Feld " + (i + 1)}</label>
+      <select class="form-input form-select share-config-select" data-slot="${i}">${options}</select>
     </div>
   `).join("");
+
+  container.querySelectorAll(".share-config-select").forEach((sel, i) => {
+    sel.value = config[i] || "";
+    sel.addEventListener("change", async () => {
+      const newConfig = getShareCardConfig().slice();
+      newConfig[i] = sel.value || null;
+      state.settings.shareCardConfig = newConfig;
+      await update(REFS.settings(), { shareCardConfig: newConfig });
+      renderShareSummary();
+    });
+  });
+}
+
+function renderShareSummary() {
+  const range = getWeekRange(state.weeklyReviewOffset);
+  document.getElementById("share-range").textContent = range.label;
+
+  const pool = computeShareStatPool(range);
+  const config = getShareCardConfig();
+
+  const slotsHtml = config.map((statId, i) => {
+    if (!statId) return "";
+    const def = SHARE_STAT_DEFS.find(s => s.id === statId);
+    if (!def) return "";
+    return `
+      <div class="share-stat ${i === 0 ? "share-stat-hero" : ""}">
+        <span class="share-stat-icon">${def.icon}</span>
+        <div class="share-stat-value">${pool[statId]}</div>
+        <div class="share-stat-label">${def.label}</div>
+      </div>
+    `;
+  }).join("");
+
+  document.getElementById("share-stat-grid").innerHTML = slotsHtml;
 }
 
 document.getElementById("share-summary-btn").addEventListener("click", () => {
+  renderShareConfigUI();
   renderShareSummary();
   openModal("modal-share-summary");
 });
 document.getElementById("close-share-summary-btn").addEventListener("click", () => closeModal("modal-share-summary"));
+
 
 function populateWorkoutCalendarSelect() {
   const sel = document.getElementById("workout-calendar");

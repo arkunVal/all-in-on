@@ -2001,6 +2001,11 @@ function buildWorkoutItemHtml(w) {
         <div class="workout-detail-label">${w.sport === "bike" ? "Ø Geschwindigkeit" : "Ø Pace"}</div>
         <div class="workout-detail-value">${computeWorkoutMetric(w.sport, w.distance, w.durationHours, w.durationMinutes, w.durationSeconds) || "–"}</div>
       </div>` : ""}
+      ${(w.sport === "run" || w.sport === "bike") ? `
+      <div class="workout-detail-cell">
+        <div class="workout-detail-label">Höhenmeter</div>
+        <div class="workout-detail-value">${w.elevation !== undefined && w.elevation !== null ? w.elevation + " hm" : "–"}</div>
+      </div>` : ""}
       <div class="workout-detail-cell">
         <div class="workout-detail-label">Belastung</div>
         <div class="workout-detail-value">${w.load ?? "–"}</div>
@@ -2584,14 +2589,17 @@ function setSelectedSport(sport) {
 
   const distanceGroup = document.getElementById("workout-distance-group");
   const otherTypeGroup = document.getElementById("other-type-group");
+  const elevationGroup = document.getElementById("workout-elevation-group");
 
   if (sport === "other") {
     distanceGroup.style.display = "none";
     otherTypeGroup.style.display = "block";
+    elevationGroup.style.display = "none";
     setSelectedOtherType(selectedOtherType);
   } else {
     distanceGroup.style.display = "block";
     otherTypeGroup.style.display = "none";
+    elevationGroup.style.display = (sport === "run" || sport === "bike") ? "block" : "none";
     document.getElementById("workout-distance-unit-label").textContent = `(${distanceUnitFor(sport)})`;
   }
 
@@ -2651,6 +2659,7 @@ function openWorkoutModal(workout, workoutId) {
   document.getElementById("workout-duration-m").value = workout?.durationMinutes ?? "";
   document.getElementById("workout-duration-s").value = workout?.durationSeconds ?? "";
   document.getElementById("workout-distance").value = workout?.distance ?? "";
+  document.getElementById("workout-elevation").value = workout?.elevation ?? "";
   document.getElementById("workout-load").value = workout?.load ?? "";
   document.getElementById("workout-hr").value = workout?.avgHr ?? "";
 
@@ -2705,7 +2714,14 @@ async function handleFitFileUpload(file) {
     }
 
     const decoder = new Decoder(stream);
-    const { messages, errors } = decoder.read();
+    const { messages, errors } = decoder.read({
+      applyScaleAndOffset: true,
+      expandComponents: true,
+      expandSubFields: true,
+      convertTypesToStrings: true,
+      convertDateTimesToDates: true,
+      mergeHeartRates: true
+    });
     if (errors && errors.length) console.warn("FIT-Parsing-Hinweise:", errors);
 
     const session = messages.sessionMesgs?.[0];
@@ -2713,6 +2729,8 @@ async function handleFitFileUpload(file) {
       showToast("Keine Trainingszusammenfassung in dieser Datei gefunden");
       return;
     }
+    // Zum Prüfen der Rohwerte bei abweichenden Geräten/Firmware-Versionen in der Konsole sichtbar machen
+    console.log("FIT-Session (Rohdaten):", session);
 
     const sport = mapFitSportToAppSport(session.sport);
     const sportLabels = { swim: "Schwimmen", bike: "Radfahren", run: "Laufen", other: "Training" };
@@ -2729,16 +2747,31 @@ async function handleFitFileUpload(file) {
         : Math.round((session.totalDistance / 1000) * 100) / 100;
     }
 
+    // Höhenmeter (nur für Run/Bike relevant) — FIT-Feld heißt "totalAscent"
+    let elevation = null;
+    if ((sport === "run" || sport === "bike") && session.totalAscent !== undefined && session.totalAscent !== null) {
+      elevation = Math.round(session.totalAscent);
+    }
+
     const date = session.startTime instanceof Date ? toDateString(session.startTime) : today();
 
-    // Punkt 1: Aerob/Anaerob direkt aus Garmins Firstbeat-Trainingseffekt übernehmen (identische 0.0-5.0-Skala)
-    const clampEffect = (v) => Math.max(0, Math.min(5, Math.round((v ?? 0) * 10) / 10));
-    const focusAerobic = session.totalTrainingEffect !== undefined ? clampEffect(session.totalTrainingEffect) : 0;
-    const focusAnaerobic = session.totalAnaerobicTrainingEffect !== undefined ? clampEffect(session.totalAnaerobicTrainingEffect) : 0;
+    // Aerob/Anaerob direkt aus Garmins Firstbeat-Trainingseffekt übernehmen (Skala 0.0–5.0).
+    // Manche Geräte/Firmware-Kombinationen liefern den Rohwert unskaliert (0–50) statt bereits
+    // geteilt durch 10 — daher hier defensiv erkennen und ggf. selbst durch 10 teilen.
+    const normalizeEffect = (v) => {
+      if (v === undefined || v === null) return 0;
+      let n = Number(v);
+      if (n > 5) n = n / 10; // unskalierter Rohwert erkannt
+      return Math.max(0, Math.min(5, Math.round(n * 10) / 10));
+    };
+    const focusAerobic = normalizeEffect(session.totalTrainingEffect);
+    const focusAnaerobic = normalizeEffect(session.totalAnaerobicTrainingEffect ?? session.totalAnaerobicEffect);
 
-    // Belastungswert: kein einheitliches FIT-Standardfeld verfügbar — verbrannte Kalorien sind der
-    // universellste vorhandene Näherungswert für die Trainingsbelastung und werden als Startwert übernommen.
-    const load = (session.totalCalories !== undefined && session.totalCalories !== null) ? Math.round(session.totalCalories) : null;
+    // Belastungswert: es gibt kein einheitliches FIT-Standardfeld für den hier verwendeten
+    // 0-100-artigen Belastungswert. Verbrannte Kalorien liegen auf einer völlig anderen Skala
+    // (oft 500-1000+) und würden das Feld verfälschen — deshalb bewusst leer lassen und
+    // manuell eintragen lassen, statt einen irreführenden Wert vorzubefüllen.
+    const load = null;
 
     const prefilled = {
       sport,
@@ -2747,6 +2780,7 @@ async function handleFitFileUpload(file) {
       date,
       durationHours, durationMinutes, durationSeconds,
       distance,
+      elevation,
       avgHr: session.avgHeartRate ?? null,
       load,
       focusAerobic,
@@ -2781,6 +2815,7 @@ document.getElementById("save-workout-btn").addEventListener("click", async () =
   const durationMinutes = document.getElementById("workout-duration-m").value;
   const durationSeconds = document.getElementById("workout-duration-s").value;
   const distance = document.getElementById("workout-distance").value;
+  const elevation = document.getElementById("workout-elevation").value;
   const load = document.getElementById("workout-load").value;
   const avgHr = document.getElementById("workout-hr").value;
   const focusAerobic = document.getElementById("workout-focus-aerob").value;
@@ -2788,6 +2823,8 @@ document.getElementById("save-workout-btn").addEventListener("click", async () =
 
   if (!calendarId) { showToast("Bitte Kalender wählen"); shakeModal("modal-workout"); return; }
   if (!date) { showToast("Bitte Datum wählen"); shakeModal("modal-workout"); return; }
+
+  const elevationEnabled = selectedSport === "run" || selectedSport === "bike";
 
   const payload = {
     sport: selectedSport,
@@ -2799,6 +2836,7 @@ document.getElementById("save-workout-btn").addEventListener("click", async () =
     durationMinutes: durationMinutes === "" ? 0 : Number(durationMinutes),
     durationSeconds: durationSeconds === "" ? 0 : Number(durationSeconds),
     distance: selectedSport === "other" ? null : (distance === "" ? null : Number(distance)),
+    elevation: (elevationEnabled && elevation !== "") ? Number(elevation) : null,
     load: load === "" ? null : Number(load),
     avgHr: avgHr === "" ? null : Number(avgHr),
     focusAerobic: Number(focusAerobic),

@@ -1148,6 +1148,13 @@
         <input class="form-input" id="product-name-input" type="text" placeholder="z.B. Hähnchenbrust, Reis…" autocomplete="off" />
       </div>
       <div class="form-group">
+        <label class="form-label">Einheit</label>
+        <div class="nutrition-tabs" id="product-unit-toggle">
+          <button type="button" class="tab-btn active" data-unit="g">Gramm</button>
+          <button type="button" class="tab-btn" data-unit="piece">Stückzahl</button>
+        </div>
+      </div>
+      <div class="form-group" id="product-serving-group">
         <label class="form-label" for="product-serving-input">Portionsgröße (g)</label>
         <input class="form-input" id="product-serving-input" type="number" placeholder="100" value="100" min="1" />
       </div>
@@ -1156,7 +1163,7 @@
         <input class="form-input" id="product-calories-input" type="number" placeholder="0" min="0" />
       </div>
 
-      <p class="nutrition-table-title">Nährwerte</p>
+      <p class="nutrition-table-title" id="nutrition-table-title">Nährwerte (pro Portion)</p>
       <div class="nutrition-table">
         <div class="nutrition-table-row">
           <label class="form-label" for="product-fat-input">Fett (g)</label>
@@ -1188,7 +1195,7 @@
         </div>
       </div>
 
-      <p class="form-hint">Alle Werte beziehen sich auf die angegebene Portionsgröße.</p>
+      <p class="form-hint" id="product-form-hint">Alle Werte beziehen sich auf die angegebene Portionsgröße.</p>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="cancel-product-btn">Abbrechen</button>
         <button class="btn btn-primary" id="save-product-btn">Speichern</button>
@@ -1240,9 +1247,10 @@
         <select class="form-input form-select" id="nutrition-log-type">
           <option value="product">Produkt</option>
           <option value="meal">Mahlzeit</option>
+          <option value="manual">Manuell</option>
         </select>
       </div>
-      <div class="form-group">
+      <div class="form-group" id="nutrition-log-selection-group">
         <label class="form-label" for="nutrition-log-search">Auswahl</label>
 
         <div id="nutrition-log-selected" class="nutrition-log-selected" style="display:none;">
@@ -1263,6 +1271,35 @@
         <input class="form-input" id="nutrition-log-amount" type="number" placeholder="100" min="1" />
         <p class="form-hint" id="nutrition-log-amount-hint" style="display:none;">Wie viel Prozent der Mahlzeit hast du gegessen? (z.B. 50 = die Hälfte)</p>
       </div>
+
+      <!-- Manueller Eintrag: Kalorien + Verteilung auf Protein/KH/Fett direkt eingeben -->
+      <div id="nutrition-log-manual-group" style="display:none;">
+        <div class="form-group">
+          <label class="form-label" for="nutrition-log-manual-label">Bezeichnung (optional)</label>
+          <input class="form-input" id="nutrition-log-manual-label" type="text" placeholder="z.B. Restaurant-Essen" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="nutrition-log-manual-calories">Kalorien (kcal)</label>
+          <input class="form-input" id="nutrition-log-manual-calories" type="number" placeholder="0" min="0" />
+        </div>
+        <p class="nutrition-table-title">Verteilung</p>
+        <div class="nutrition-table">
+          <div class="nutrition-table-row">
+            <label class="form-label" for="nutrition-log-manual-protein">Proteine (g)</label>
+            <input class="form-input" id="nutrition-log-manual-protein" type="number" placeholder="0" min="0" step="0.1" />
+          </div>
+          <div class="nutrition-table-row">
+            <label class="form-label" for="nutrition-log-manual-carbs">Kohlenhydrate (g)</label>
+            <input class="form-input" id="nutrition-log-manual-carbs" type="number" placeholder="0" min="0" step="0.1" />
+          </div>
+          <div class="nutrition-table-row">
+            <label class="form-label" for="nutrition-log-manual-fat">Fett (g)</label>
+            <input class="form-input" id="nutrition-log-manual-fat" type="number" placeholder="0" min="0" step="0.1" />
+          </div>
+        </div>
+        <p class="form-hint" id="nutrition-log-manual-check"></p>
+      </div>
+
       <div class="modal-actions">
         <button class="btn btn-ghost" id="cancel-nutrition-log-btn">Abbrechen</button>
         <button class="btn btn-primary" id="save-nutrition-log-btn">Hinzufügen</button>

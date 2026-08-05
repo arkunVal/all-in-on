@@ -3578,6 +3578,33 @@ function notifyServiceWorkerOfUid(uid) {
 
 // ── PRODUKTE VERWALTEN ──
 
+// ── Produkt-Einheit: Gramm oder Stückzahl ──
+let productUnit = "g";
+
+function setProductUnit(unit) {
+  productUnit = unit;
+  document.querySelectorAll("#product-unit-toggle .tab-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.unit === unit);
+  });
+  const servingGroup = document.getElementById("product-serving-group");
+  const tableTitle = document.getElementById("nutrition-table-title");
+  const hint = document.getElementById("product-form-hint");
+
+  if (unit === "piece") {
+    servingGroup.style.display = "none";
+    tableTitle.textContent = "Nährwerte (pro Stück)";
+    hint.textContent = "Alle Werte beziehen sich auf 1 Stück.";
+  } else {
+    servingGroup.style.display = "block";
+    tableTitle.textContent = "Nährwerte (pro Portion)";
+    hint.textContent = "Alle Werte beziehen sich auf die angegebene Portionsgröße.";
+  }
+}
+
+document.querySelectorAll("#product-unit-toggle .tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => setProductUnit(btn.dataset.unit));
+});
+
 async function createProduct() {
   const name = document.getElementById("product-name-input").value.trim();
   const calories = Number(document.getElementById("product-calories-input").value) || 0;
@@ -3588,14 +3615,14 @@ async function createProduct() {
   const fiber = Number(document.getElementById("product-fiber-input").value) || 0;
   const protein = Number(document.getElementById("product-protein-input").value) || 0;
   const salt = Number(document.getElementById("product-salt-input").value) || 0;
-  const serving = Number(document.getElementById("product-serving-input").value) || 100;
+  const serving = productUnit === "piece" ? 1 : (Number(document.getElementById("product-serving-input").value) || 100);
 
   if (!name) {
     shakeModal("modal-product");
     return;
   }
 
-  const data = { name, calories, fat, satFat, carbs, sugar, fiber, protein, salt, serving };
+  const data = { name, calories, fat, satFat, carbs, sugar, fiber, protein, salt, serving, unit: productUnit };
 
   if (state.editingProductId) {
     await set(REFS.product(state.editingProductId), data);
@@ -3616,6 +3643,7 @@ function clearProductInputs() {
    "product-carbs-input","product-sugar-input","product-fiber-input","product-protein-input","product-salt-input"]
     .forEach(id => document.getElementById(id).value = "");
   document.getElementById("product-serving-input").value = "100";
+  setProductUnit("g");
 }
 
 async function deleteProduct(id) {
@@ -3643,6 +3671,7 @@ function editProduct(id) {
   document.getElementById("product-protein-input").value = p.protein;
   document.getElementById("product-salt-input").value = p.salt || 0;
   document.getElementById("product-serving-input").value = p.serving || 100;
+  setProductUnit(p.unit === "piece" ? "piece" : "g");
   openModal("modal-product");
 }
 
@@ -3666,7 +3695,7 @@ function renderNutritionProducts() {
           <span class="macro-chip" style="--chip-color: var(--success)">K ${p.carbs}g</span>
           <span class="macro-chip" style="--chip-color: var(--prio-high)">P ${p.protein}g</span>
         </div>
-        <div class="nutrition-product-serving">${p.serving}g pro Portion</div>
+        <div class="nutrition-product-serving">${p.unit === "piece" ? "pro Stück" : p.serving + "g pro Portion"}</div>
       </div>
       <div class="nutrition-product-actions">
         <button class="icon-btn" onclick="editProduct('${p.id}')" aria-label="Bearbeiten">
@@ -3728,25 +3757,28 @@ function renderMealProductSelector() {
     <div class="meal-product-selector-item" data-product-id="${p.id}">
       <div>
         <div class="font-bold">${escHtml(p.name)}</div>
-        <div class="text-sm text-gray">${p.calories} kcal · ${p.serving}g</div>
+        <div class="text-sm text-gray">${p.calories} kcal · ${p.unit === "piece" ? "pro Stück" : p.serving + "g"}</div>
       </div>
-      <button class="btn btn-sm" onclick="addMealProduct('${p.id}', '${escHtml(p.name)}', ${p.calories}, ${p.protein}, ${p.carbs}, ${p.fat}, ${p.serving})">+</button>
+      <button class="btn btn-sm" onclick="addMealProduct('${p.id}', '${escHtml(p.name)}', ${p.calories}, ${p.protein}, ${p.carbs}, ${p.fat}, ${p.serving}, '${p.unit === "piece" ? "piece" : "g"}')">+</button>
     </div>
   `).join("");
 }
 
-function addMealProduct(productId, name, calories, protein, carbs, fat, serving) {
+function addMealProduct(productId, name, calories, protein, carbs, fat, serving, unit) {
   const container = document.getElementById("meal-products-selected");
-  const amount = prompt(`Menge in Gramm für "${name}" (Standard: ${serving}g)?`, serving);
+  const isPiece = unit === "piece";
+  const amount = prompt(
+    isPiece ? `Anzahl Stück für "${name}"?` : `Menge in Gramm für "${name}" (Standard: ${serving}g)?`,
+    serving
+  );
   if (!amount || isNaN(amount)) return;
 
   const numAmount = Number(amount);
-  const multiplier = numAmount / serving;
   const html = `
     <div class="meal-product-item" data-product-id="${productId}" data-amount="${numAmount}">
       <div class="meal-product-item-info">
         <span>${escHtml(name)}</span>
-        <span class="text-sm text-gray">${numAmount}g</span>
+        <span class="text-sm text-gray">${numAmount}${isPiece ? " Stück" : "g"}</span>
       </div>
       <button class="icon-btn delete-btn" onclick="this.parentElement.remove()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -3781,7 +3813,7 @@ function editMeal(id) {
       <div class="meal-product-item" data-product-id="${item.productId}" data-amount="${item.amount}">
         <div class="meal-product-item-info">
           <span>${escHtml(p.name)}</span>
-          <span class="text-sm text-gray">${item.amount}g</span>
+          <span class="text-sm text-gray">${item.amount}${p.unit === "piece" ? " Stück" : "g"}</span>
         </div>
         <button class="icon-btn delete-btn" onclick="this.parentElement.remove()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -3873,6 +3905,38 @@ function computeMealMacros(meal) {
 async function logNutritionEntry() {
   const category = document.getElementById("nutrition-log-category").value;
   const type = document.getElementById("nutrition-log-type").value;
+  const dateStr = state.selectedDate;
+  const entries = state.nutritionEntries[dateStr] || [];
+
+  if (type === "manual") {
+    const label = document.getElementById("nutrition-log-manual-label").value.trim();
+    const calories = Number(document.getElementById("nutrition-log-manual-calories").value) || 0;
+    const protein = Number(document.getElementById("nutrition-log-manual-protein").value) || 0;
+    const carbs = Number(document.getElementById("nutrition-log-manual-carbs").value) || 0;
+    const fat = Number(document.getElementById("nutrition-log-manual-fat").value) || 0;
+
+    if (calories <= 0) {
+      shakeModal("modal-nutrition-log");
+      return;
+    }
+
+    const newEntry = {
+      category,
+      type: "manual",
+      label: label || null,
+      calories, protein, carbs, fat,
+      timestamp: Date.now(),
+      id: Math.random().toString(36).substr(2, 9)
+    };
+    entries.push(newEntry);
+    await set(REFS.nutrition(dateStr), entries);
+    showToast("Eintrag hinzugefügt ✓");
+    closeModal("modal-nutrition-log");
+    clearNutritionLogInputs();
+    renderNutritionToday();
+    return;
+  }
+
   const itemId = document.getElementById("nutrition-log-item").value;
   const amount = Number(document.getElementById("nutrition-log-amount").value);
 
@@ -3881,8 +3945,6 @@ async function logNutritionEntry() {
     return;
   }
 
-  const dateStr = state.selectedDate;
-  const entries = state.nutritionEntries[dateStr] || [];
   const newEntry = {
     category,
     type,
@@ -3905,8 +3967,15 @@ function clearNutritionLogInputs() {
   document.getElementById("nutrition-log-item").value = "";
   document.getElementById("nutrition-log-amount").value = "";
   document.getElementById("nutrition-log-search").value = "";
+  document.getElementById("nutrition-log-manual-label").value = "";
+  document.getElementById("nutrition-log-manual-calories").value = "";
+  document.getElementById("nutrition-log-manual-protein").value = "";
+  document.getElementById("nutrition-log-manual-carbs").value = "";
+  document.getElementById("nutrition-log-manual-fat").value = "";
+  document.getElementById("nutrition-log-manual-check").textContent = "";
   showNutritionLogSearch();
   updateNutritionLogAmountFields();
+  updateNutritionLogTypeUI();
 }
 
 async function deleteNutritionEntry(entryId) {
@@ -3946,6 +4015,48 @@ function updateNutritionLogAmountFields() {
   }
 }
 
+/** Blendet je nach gewähltem Typ (Produkt/Mahlzeit vs. Manuell) die passenden Formularbereiche ein/aus */
+function updateNutritionLogTypeUI() {
+  const type = document.getElementById("nutrition-log-type").value;
+  const selectionGroup = document.getElementById("nutrition-log-selection-group");
+  const manualGroup = document.getElementById("nutrition-log-manual-group");
+
+  if (type === "manual") {
+    selectionGroup.style.display = "none";
+    document.getElementById("nutrition-log-amount-group").style.display = "none";
+    manualGroup.style.display = "block";
+  } else {
+    selectionGroup.style.display = "block";
+    manualGroup.style.display = "none";
+    showNutritionLogSearch();
+    updateNutritionLogAmountFields();
+  }
+}
+
+/** Zeigt live an, ob die eingegebene Kalorienzahl zur Protein/KH/Fett-Verteilung passt */
+function updateNutritionLogManualCheck() {
+  const calories = Number(document.getElementById("nutrition-log-manual-calories").value) || 0;
+  const protein = Number(document.getElementById("nutrition-log-manual-protein").value) || 0;
+  const carbs = Number(document.getElementById("nutrition-log-manual-carbs").value) || 0;
+  const fat = Number(document.getElementById("nutrition-log-manual-fat").value) || 0;
+  const check = document.getElementById("nutrition-log-manual-check");
+
+  const impliedKcal = Math.round(protein * 4 + carbs * 4 + fat * 9);
+  if (!calories && !protein && !carbs && !fat) {
+    check.textContent = "";
+    return;
+  }
+  const diff = calories - impliedKcal;
+  if (Math.abs(diff) <= 15) {
+    check.textContent = `✓ Verteilung passt zu den Kalorien (≈ ${impliedKcal} kcal)`;
+  } else {
+    check.textContent = `Hinweis: Protein/KH/Fett ergeben ≈ ${impliedKcal} kcal, du hast ${calories} kcal eingetragen.`;
+  }
+}
+
+document.querySelectorAll("#nutrition-log-manual-calories, #nutrition-log-manual-protein, #nutrition-log-manual-carbs, #nutrition-log-manual-fat")
+  .forEach(el => el.addEventListener("input", updateNutritionLogManualCheck));
+
 /** Liefert die aktuell wählbaren Einträge (Produkte oder Mahlzeiten), alphabetisch sortiert */
 function nutritionLogItemsSource() {
   const type = document.getElementById("nutrition-log-type").value;
@@ -3965,9 +4076,12 @@ function renderNutritionLogResults(query) {
   }
 
   container.innerHTML = items.map(i => {
-    const sub = type === "product" ? `${i.calories} kcal · ${i.serving}g` : `${computeMealMacros(i).calories} kcal`;
+    const sub = type === "product"
+      ? `${i.calories} kcal · ${i.unit === "piece" ? "pro Stück" : i.serving + "g"}`
+      : `${computeMealMacros(i).calories} kcal`;
+    const unit = type === "product" && i.unit === "piece" ? "piece" : "g";
     return `
-      <button type="button" class="nutrition-log-result-item" data-id="${i.id}" data-name="${escHtml(i.name)}">
+      <button type="button" class="nutrition-log-result-item" data-id="${i.id}" data-name="${escHtml(i.name)}" data-unit="${unit}">
         <span class="nutrition-log-result-icon">${type === "product" ? "🥣" : "🍽️"}</span>
         <span class="nutrition-log-result-text">
           <span class="nutrition-log-result-name">${escHtml(i.name)}</span>
@@ -3978,18 +4092,33 @@ function renderNutritionLogResults(query) {
   }).join("");
 
   container.querySelectorAll(".nutrition-log-result-item").forEach(btn => {
-    btn.addEventListener("click", () => selectNutritionLogItem(btn.dataset.id, btn.dataset.name));
+    btn.addEventListener("click", () => selectNutritionLogItem(btn.dataset.id, btn.dataset.name, btn.dataset.unit));
   });
 }
 
-function selectNutritionLogItem(id, name) {
+function selectNutritionLogItem(id, name, unit) {
+  const type = document.getElementById("nutrition-log-type").value;
   document.getElementById("nutrition-log-item").value = id;
   document.getElementById("nutrition-log-selected-name").textContent = name;
-  document.getElementById("nutrition-log-selected-icon").textContent =
-    document.getElementById("nutrition-log-type").value === "product" ? "🥣" : "🍽️";
+  document.getElementById("nutrition-log-selected-icon").textContent = type === "product" ? "🥣" : "🍽️";
   document.getElementById("nutrition-log-selected").style.display = "flex";
   document.getElementById("nutrition-log-search-wrap").style.display = "none";
   document.getElementById("nutrition-log-amount-group").style.display = "block";
+
+  const amountLabel = document.getElementById("nutrition-log-amount-label");
+  const amountInput = document.getElementById("nutrition-log-amount");
+  const amountHint = document.getElementById("nutrition-log-amount-hint");
+  if (type === "product" && unit === "piece") {
+    amountLabel.textContent = "Anzahl (Stück)";
+    amountInput.placeholder = "1";
+    amountInput.removeAttribute("max");
+    amountHint.style.display = "none";
+  } else if (type === "product") {
+    amountLabel.textContent = "Menge (g)";
+    amountInput.placeholder = "100";
+    amountInput.removeAttribute("max");
+    amountHint.style.display = "none";
+  }
   document.getElementById("nutrition-log-amount").focus();
 }
 
@@ -4025,6 +4154,11 @@ function computeEntryMacros(entry) {
       acc.protein  += totals.protein * mult;
       acc.salt     += totals.salt * mult;
     }
+  } else if (entry.type === "manual") {
+    acc.calories += entry.calories || 0;
+    acc.protein  += entry.protein || 0;
+    acc.carbs    += entry.carbs || 0;
+    acc.fat      += entry.fat || 0;
   }
   return roundMacros(acc);
 }
@@ -4079,7 +4213,15 @@ function renderNutritionToday() {
   function entryItemName(e) {
     if (e.type === "product" && state.products[e.itemId]) return state.products[e.itemId].name;
     if (e.type === "meal" && state.meals[e.itemId]) return state.meals[e.itemId].name;
+    if (e.type === "manual") return e.label || "Manueller Eintrag";
     return "Unbekannt";
+  }
+
+  function entryAmountUnit(e) {
+    if (e.type === "meal") return "%";
+    if (e.type === "manual") return "";
+    if (e.type === "product" && state.products[e.itemId]?.unit === "piece") return " Stück";
+    return "g";
   }
 
   // Einträge pro Kategorie rendern (unkategorisierte ältere Einträge landen unter "Snacks")
@@ -4099,10 +4241,10 @@ function renderNutritionToday() {
       catAcc.fat      += entryMacros.fat;
       return `
       <li class="nutrition-entry-item">
-        <span class="nutrition-entry-type-icon">${e.type === "meal" ? "🍽️" : "🥣"}</span>
+        <span class="nutrition-entry-type-icon">${e.type === "meal" ? "🍽️" : e.type === "manual" ? "✏️" : "🥣"}</span>
         <div class="nutrition-entry-info">
           <div class="nutrition-entry-name">${escHtml(entryItemName(e))}</div>
-          <div class="nutrition-entry-amount text-sm text-gray">${e.amount}${e.type === "meal" ? "%" : "g"}</div>
+          <div class="nutrition-entry-amount text-sm text-gray">${e.type === "manual" ? "Manuell erfasst" : e.amount + entryAmountUnit(e)}</div>
         </div>
         <span class="nutrition-entry-kcal">${entryMacros.calories} <small>kcal</small></span>
         <button class="icon-btn delete-btn" onclick="deleteNutritionEntry('${e.id}')" aria-label="Löschen">
@@ -4268,10 +4410,7 @@ document.querySelectorAll(".nutrition-category-add").forEach(btn => {
   btn.addEventListener("click", () => openNutritionLogModal(btn.dataset.category));
 });
 
-document.getElementById("nutrition-log-type").addEventListener("change", () => {
-  showNutritionLogSearch();
-  updateNutritionLogAmountFields();
-});
+document.getElementById("nutrition-log-type").addEventListener("change", updateNutritionLogTypeUI);
 document.getElementById("nutrition-log-search").addEventListener("input", (e) => {
   renderNutritionLogResults(e.target.value);
 });

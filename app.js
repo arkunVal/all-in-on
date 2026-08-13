@@ -1070,6 +1070,7 @@ function toggleMonthExpand() {
   expand.classList.toggle("open", state.monthExpanded);
   monthNav.classList.toggle("open", state.monthExpanded);
   toggleBtn.classList.toggle("open", state.monthExpanded);
+  document.getElementById("expand-toggle-label").textContent = state.monthExpanded ? "Monat ausblenden" : "Monat anzeigen";
   if (state.monthExpanded) renderCalendar();
 }
 
@@ -2198,9 +2199,10 @@ function renderWeeklyReview() {
     totalMinutes += mins;
     if (w.load !== undefined && w.load !== null) totalLoad += Number(w.load);
     // Punkt 5: "Sonstiges" (HIT/Athletik/Mobility) fließt nicht in den Ø Fokus Aerob/Anaerob ein
+    // Ein Wert von 0.0 gilt als "nicht erfasst" und fließt ebenfalls nicht mit ein
     if (w.sport !== "other") {
-      if (w.focusAerobic !== undefined && w.focusAerobic !== null) { aerobSum += Number(w.focusAerobic); aerobCount++; }
-      if (w.focusAnaerobic !== undefined && w.focusAnaerobic !== null) { anaerobSum += Number(w.focusAnaerobic); anaerobCount++; }
+      if (w.focusAerobic !== undefined && w.focusAerobic !== null && Number(w.focusAerobic) > 0) { aerobSum += Number(w.focusAerobic); aerobCount++; }
+      if (w.focusAnaerobic !== undefined && w.focusAnaerobic !== null && Number(w.focusAnaerobic) > 0) { anaerobSum += Number(w.focusAnaerobic); anaerobCount++; }
     }
 
     const key = w.sport === "other" ? (w.otherType || "other") : w.sport;

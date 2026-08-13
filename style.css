@@ -322,22 +322,19 @@ body {
   50%      { text-shadow: 0 0 12px var(--accent-glow); }
 }
 
-/* Kalender-Header direkt unter dem Hero bekommt eine dezente Abrundung nach oben */
-.cal-header-block {
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-}
-
 /* ═══════════════════════════════════════════
    KALENDER — NEUES LAYOUT (Punkt 4)
    ═══════════════════════════════════════════ */
 
 .cal-header-block {
-  background: var(--bg-2);
-  border-bottom: 1px solid var(--border);
-  margin: 0 calc(-1 * var(--space-md));
-  padding: var(--space-sm) var(--space-md) 0;
+  background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-md) var(--space-md) 0;
   position: sticky;
-  top: 0;
+  top: var(--space-xs);
   z-index: 5;
 }
 
@@ -401,7 +398,7 @@ body {
 
 .week-day-item {
   display: flex; flex-direction: column; align-items: center;
-  gap: 3px; padding: var(--space-xs) 0;
+  gap: 4px; padding: var(--space-xs) 0;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background var(--transition-fast);
@@ -409,12 +406,14 @@ body {
 .week-day-item:active { background: var(--bg-4); }
 
 .week-day-num {
-  width: 30px; height: 30px;
+  width: 34px; height: 34px;
   display: flex; align-items: center; justify-content: center;
   border-radius: var(--radius-full);
   font-size: var(--text-sm); font-weight: 600;
   color: var(--text-1);
 }
+.week-day-item:nth-child(6) .week-day-num,
+.week-day-item:nth-child(7) .week-day-num { color: var(--accent-light); }
 .week-day-item.today .week-day-num  {
   background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
   color: #fff;
@@ -433,18 +432,21 @@ body {
 
 /* Aufklapp-Button */
 .expand-toggle {
-  display: flex; align-items: center; justify-content: center;
-  width: 100%; height: 22px;
-  background: none; border: none;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  width: fit-content; margin: var(--space-xs) auto var(--space-sm);
+  padding: 5px 14px 5px 16px;
+  background: var(--bg-3); border: 1px solid var(--border);
+  border-radius: var(--radius-full);
   color: var(--text-2); cursor: pointer;
-  transition: color var(--transition-fast);
+  font-size: 11px; font-weight: 600;
+  transition: color var(--transition-fast), background var(--transition-fast);
 }
 .expand-toggle svg {
-  width: 16px; height: 16px;
+  width: 14px; height: 14px;
   transition: transform var(--transition-slow);
 }
 .expand-toggle.open svg { transform: rotate(180deg); }
-.expand-toggle:active { color: var(--text-1); }
+.expand-toggle:active { color: var(--text-1); background: var(--bg-4); }
 
 /* Aufklappbarer Monatskalender */
 .month-expand {
@@ -476,18 +478,22 @@ body {
 .cal-day {
   aspect-ratio: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  border-radius: var(--radius-sm); cursor: pointer; position: relative;
+  border-radius: var(--radius-md); cursor: pointer; position: relative;
   transition: background var(--transition-fast); gap: 2px;
 }
 .cal-day:active { background: var(--bg-4); }
 
 .cal-day-num {
   font-size: var(--text-sm); font-weight: 500; color: var(--text-1);
-  width: 26px; height: 26px;
+  width: 28px; height: 28px;
   display: flex; align-items: center; justify-content: center;
   border-radius: var(--radius-full);
 }
-.cal-day.other-month .cal-day-num { color: var(--text-2); }
+.cal-day.other-month .cal-day-num { color: var(--text-2); opacity: 0.5; }
+.cal-day:nth-child(7n+6) .cal-day-num,
+.cal-day:nth-child(7n) .cal-day-num { color: var(--accent-light); }
+.cal-day.other-month:nth-child(7n+6) .cal-day-num,
+.cal-day.other-month:nth-child(7n) .cal-day-num { color: var(--text-2); }
 .cal-day.today .cal-day-num       {
   background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
   color: #fff;

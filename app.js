@@ -3607,8 +3607,47 @@ document.querySelectorAll("#product-unit-toggle .tab-btn").forEach(btn => {
   btn.addEventListener("click", () => setProductUnit(btn.dataset.unit));
 });
 
+// ── Icon/Emoji-Auswahl für Produkte & Mahlzeiten ──
+const ICON_PICKER_EMOJIS = [
+  "🥣","🍽️","🍎","🍌","🍊","🍇","🍓","🫐","🍑","🍍","🥝","🍉",
+  "🥑","🥕","🥦","🌽","🥔","🍅","🥒","🫑","🧄","🧅","🍄","🥬",
+  "🍞","🥐","🥖","🥯","🧀","🥚","🥞","🧇","🍳","🥩","🍗","🍖",
+  "🥓","🌭","🍔","🍕","🌮","🌯","🥙","🥗","🍜","🍝","🍲","🍛",
+  "🍣","🍱","🍤","🍚","🍙","🥟","🍢","🥘","🫕","🥫","🍿","🥨",
+  "🥜","🍯","🧈","🥛","🧃","☕","🍵","🥤","🍰","🎂","🍩","🍪",
+  "🍦","🍫","🍬","🍭","🥧","🍨"
+];
+
+let iconPickerTarget = null; // "product" | "meal"
+
+function renderIconPickerGrid() {
+  const grid = document.getElementById("icon-picker-grid");
+  grid.innerHTML = ICON_PICKER_EMOJIS.map(e => `<button type="button" class="icon-picker-option" data-emoji="${e}">${e}</button>`).join("");
+  grid.querySelectorAll(".icon-picker-option").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const emoji = btn.dataset.emoji;
+      if (iconPickerTarget === "product") {
+        document.getElementById("product-icon-preview").textContent = emoji;
+      } else if (iconPickerTarget === "meal") {
+        document.getElementById("meal-icon-preview").textContent = emoji;
+      }
+      closeModal("modal-icon-picker");
+    });
+  });
+}
+
+document.querySelectorAll(".icon-picker-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    iconPickerTarget = btn.dataset.target;
+    renderIconPickerGrid();
+    openModal("modal-icon-picker");
+  });
+});
+document.getElementById("cancel-icon-picker-btn").addEventListener("click", () => closeModal("modal-icon-picker"));
+
 async function createProduct() {
   const name = document.getElementById("product-name-input").value.trim();
+  const icon = document.getElementById("product-icon-preview").textContent.trim();
   const calories = Number(document.getElementById("product-calories-input").value) || 0;
   const fat = Number(document.getElementById("product-fat-input").value) || 0;
   const satFat = Number(document.getElementById("product-satfat-input").value) || 0;
@@ -3624,7 +3663,7 @@ async function createProduct() {
     return;
   }
 
-  const data = { name, calories, fat, satFat, carbs, sugar, fiber, protein, salt, serving, unit: productUnit };
+  const data = { name, icon, calories, fat, satFat, carbs, sugar, fiber, protein, salt, serving, unit: productUnit };
 
   if (state.editingProductId) {
     await set(REFS.product(state.editingProductId), data);
@@ -3645,6 +3684,7 @@ function clearProductInputs() {
    "product-carbs-input","product-sugar-input","product-fiber-input","product-protein-input","product-salt-input"]
     .forEach(id => document.getElementById(id).value = "");
   document.getElementById("product-serving-input").value = "100";
+  document.getElementById("product-icon-preview").textContent = "🥣";
   setProductUnit("g");
 }
 
@@ -3664,6 +3704,7 @@ function editProduct(id) {
   const p = state.products[id];
   state.editingProductId = id;
   document.getElementById("product-name-input").value = p.name;
+  document.getElementById("product-icon-preview").textContent = p.icon || "🥣";
   document.getElementById("product-calories-input").value = p.calories;
   document.getElementById("product-fat-input").value = p.fat;
   document.getElementById("product-satfat-input").value = p.satFat || 0;
@@ -3688,7 +3729,7 @@ function renderNutritionProducts() {
   const products = sortByName(toArray(state.products));
   container.innerHTML = products.map(p => `
     <div class="nutrition-product-item">
-      <div class="nutrition-product-avatar">🥣</div>
+      <div class="nutrition-product-avatar">${p.icon || "🥣"}</div>
       <div class="nutrition-product-info">
         <div class="nutrition-product-name">${escHtml(p.name)}</div>
         <div class="nutrition-product-macros">
@@ -3720,6 +3761,7 @@ function renderNutritionProducts() {
 
 async function createMeal() {
   const name = document.getElementById("meal-name-input").value.trim();
+  const icon = document.getElementById("meal-icon-preview").textContent.trim();
   const selectedProducts = Array.from(document.querySelectorAll("#meal-products-selected .meal-product-item")).map(el => ({
     productId: el.dataset.productId,
     amount: Number(el.dataset.amount)
@@ -3731,12 +3773,12 @@ async function createMeal() {
   }
 
   if (state.editingMealId) {
-    await set(REFS.meal(state.editingMealId), { name, items: selectedProducts });
+    await set(REFS.meal(state.editingMealId), { name, icon, items: selectedProducts });
     state.editingMealId = null;
     showToast("Mahlzeit aktualisiert ✓");
   } else {
     const newRef = push(REFS.meals());
-    await set(newRef, { name, items: selectedProducts });
+    await set(newRef, { name, icon, items: selectedProducts });
     showToast("Mahlzeit erstellt ✓");
   }
 
@@ -3746,6 +3788,7 @@ async function createMeal() {
 
 function clearMealInputs() {
   document.getElementById("meal-name-input").value = "";
+  document.getElementById("meal-icon-preview").textContent = "🍽️";
   document.getElementById("meal-products-selected").innerHTML = "";
   document.getElementById("meal-product-search").value = "";
   renderMealProductSelector();
@@ -3757,9 +3800,12 @@ function renderMealProductSelector() {
   const products = sortByName(toArray(state.products));
   container.innerHTML = products.map(p => `
     <div class="meal-product-selector-item" data-product-id="${p.id}">
-      <div>
-        <div class="font-bold">${escHtml(p.name)}</div>
-        <div class="text-sm text-gray">${p.calories} kcal · ${p.unit === "piece" ? "pro Stück" : p.serving + "g"}</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span>${p.icon || "🥣"}</span>
+        <div>
+          <div class="font-bold">${escHtml(p.name)}</div>
+          <div class="text-sm text-gray">${p.calories} kcal · ${p.unit === "piece" ? "pro Stück" : p.serving + "g"}</div>
+        </div>
       </div>
       <button class="btn btn-sm" onclick="addMealProduct('${p.id}', '${escHtml(p.name)}', ${p.calories}, ${p.protein}, ${p.carbs}, ${p.fat}, ${p.serving}, '${p.unit === "piece" ? "piece" : "g"}')">+</button>
     </div>
@@ -3806,6 +3852,7 @@ function editMeal(id) {
   const m = state.meals[id];
   state.editingMealId = id;
   document.getElementById("meal-name-input").value = m.name;
+  document.getElementById("meal-icon-preview").textContent = m.icon || "🍽️";
   
   const container = document.getElementById("meal-products-selected");
   container.innerHTML = (m.items || []).map(item => {
@@ -3835,7 +3882,7 @@ function renderNutritionMeals() {
     const totals = computeMealMacros(m);
     return `
       <div class="nutrition-meal-item">
-        <div class="nutrition-product-avatar nutrition-meal-avatar">🍽️</div>
+        <div class="nutrition-product-avatar nutrition-meal-avatar">${m.icon || "🍽️"}</div>
         <div class="nutrition-meal-info">
           <div class="nutrition-meal-name">${escHtml(m.name)}</div>
           <div class="nutrition-meal-macros">
@@ -4082,9 +4129,10 @@ function renderNutritionLogResults(query) {
       ? `${i.calories} kcal · ${i.unit === "piece" ? "pro Stück" : i.serving + "g"}`
       : `${computeMealMacros(i).calories} kcal`;
     const unit = type === "product" && i.unit === "piece" ? "piece" : "g";
+    const icon = i.icon || (type === "product" ? "🥣" : "🍽️");
     return `
-      <button type="button" class="nutrition-log-result-item" data-id="${i.id}" data-name="${escHtml(i.name)}" data-unit="${unit}">
-        <span class="nutrition-log-result-icon">${type === "product" ? "🥣" : "🍽️"}</span>
+      <button type="button" class="nutrition-log-result-item" data-id="${i.id}" data-name="${escHtml(i.name)}" data-unit="${unit}" data-icon="${icon}">
+        <span class="nutrition-log-result-icon">${icon}</span>
         <span class="nutrition-log-result-text">
           <span class="nutrition-log-result-name">${escHtml(i.name)}</span>
           <span class="nutrition-log-result-sub">${sub}</span>
@@ -4094,15 +4142,15 @@ function renderNutritionLogResults(query) {
   }).join("");
 
   container.querySelectorAll(".nutrition-log-result-item").forEach(btn => {
-    btn.addEventListener("click", () => selectNutritionLogItem(btn.dataset.id, btn.dataset.name, btn.dataset.unit));
+    btn.addEventListener("click", () => selectNutritionLogItem(btn.dataset.id, btn.dataset.name, btn.dataset.unit, btn.dataset.icon));
   });
 }
 
-function selectNutritionLogItem(id, name, unit) {
+function selectNutritionLogItem(id, name, unit, icon) {
   const type = document.getElementById("nutrition-log-type").value;
   document.getElementById("nutrition-log-item").value = id;
   document.getElementById("nutrition-log-selected-name").textContent = name;
-  document.getElementById("nutrition-log-selected-icon").textContent = type === "product" ? "🥣" : "🍽️";
+  document.getElementById("nutrition-log-selected-icon").textContent = icon || (type === "product" ? "🥣" : "🍽️");
   document.getElementById("nutrition-log-selected").style.display = "flex";
   document.getElementById("nutrition-log-search-wrap").style.display = "none";
   document.getElementById("nutrition-log-amount-group").style.display = "block";
@@ -4226,6 +4274,13 @@ function renderNutritionToday() {
     return "g";
   }
 
+  function entryIcon(e) {
+    if (e.type === "manual") return "✏️";
+    if (e.type === "product") return state.products[e.itemId]?.icon || "🥣";
+    if (e.type === "meal") return state.meals[e.itemId]?.icon || "🍽️";
+    return "🥣";
+  }
+
   // Einträge pro Kategorie rendern (unkategorisierte ältere Einträge landen unter "Snacks")
   NUTRITION_CATEGORIES.forEach(cat => {
     const listEl = document.getElementById(`nutrition-entries-${cat.id}`);
@@ -4243,7 +4298,7 @@ function renderNutritionToday() {
       catAcc.fat      += entryMacros.fat;
       return `
       <li class="nutrition-entry-item">
-        <span class="nutrition-entry-type-icon">${e.type === "meal" ? "🍽️" : e.type === "manual" ? "✏️" : "🥣"}</span>
+        <span class="nutrition-entry-type-icon">${entryIcon(e)}</span>
         <div class="nutrition-entry-info">
           <div class="nutrition-entry-name">${escHtml(entryItemName(e))}</div>
           <div class="nutrition-entry-amount text-sm text-gray">${e.type === "manual" ? "Manuell erfasst" : e.amount + entryAmountUnit(e)}</div>

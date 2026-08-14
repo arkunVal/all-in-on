@@ -1145,6 +1145,12 @@
       <div class="modal-handle"></div>
       <h2 class="modal-title">Produkt erstellen</h2>
       <div class="form-group">
+        <label class="form-label">Icon</label>
+        <button type="button" class="icon-picker-btn" id="product-icon-btn" data-target="product">
+          <span id="product-icon-preview">🥣</span>
+        </button>
+      </div>
+      <div class="form-group">
         <label class="form-label" for="product-name-input">Name</label>
         <input class="form-input" id="product-name-input" type="text" placeholder="z.B. Hähnchenbrust, Reis…" autocomplete="off" />
       </div>
@@ -1210,6 +1216,12 @@
       <div class="modal-handle"></div>
       <h2 class="modal-title">Mahlzeit erstellen</h2>
       <div class="form-group">
+        <label class="form-label">Icon</label>
+        <button type="button" class="icon-picker-btn" id="meal-icon-btn" data-target="meal">
+          <span id="meal-icon-preview">🍽️</span>
+        </button>
+      </div>
+      <div class="form-group">
         <label class="form-label" for="meal-name-input">Name der Mahlzeit</label>
         <input class="form-input" id="meal-name-input" type="text" placeholder="z.B. Frühstücksbowl, Mittagessen…" autocomplete="off" />
       </div>
@@ -1225,6 +1237,18 @@
       <div class="modal-actions">
         <button class="btn btn-ghost" id="cancel-meal-btn">Abbrechen</button>
         <button class="btn btn-primary" id="save-meal-btn">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Icon/Emoji-Auswahl für Produkte & Mahlzeiten -->
+  <div id="modal-icon-picker" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Icon wählen</h2>
+      <div class="icon-picker-grid" id="icon-picker-grid"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="cancel-icon-picker-btn">Schließen</button>
       </div>
     </div>
   </div>

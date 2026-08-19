@@ -117,8 +117,8 @@ const state = {
   todoFilter:           "all",
   calFilter:             "all",   // Punkt 5: aktiver Kalenderfilter
   activeProjectId:      null,
-  selectedProjectColor: "#6C63FF",
-  selectedCalendarColor:"#6C63FF",
+  selectedProjectColor: "#C9863F",
+  selectedCalendarColor:"#C9863F",
   openTodoIds:          new Set(), // welche To-Do-Beschreibungen aufgeklappt sind
   // Training-Tracking
   checkins:             {},  // { "YYYY-MM-DD": { weight, sleepHours, sleepQuality, water, caffeine } }
@@ -317,7 +317,7 @@ function escHtml(str) {
 }
 /** Liefert die Farbe eines Kalenders, Fallback = Akzentfarbe */
 function calColor(calendarId) {
-  return (calendarId && state.calendars[calendarId]?.color) || "#6C63FF";
+  return (calendarId && state.calendars[calendarId]?.color) || "#C9863F";
 }
 
 // ═══════════════════════════════════════════════════════
@@ -444,6 +444,21 @@ async function updateEvent(id, data) {
 async function deleteEvent(id) {
   try { await remove(REFS.event(id)); showToast("Termin gelöscht"); }
   catch (e) { showToast("Fehler beim Löschen: " + e.message); }
+}
+
+/** Markiert einen Termin (ggf. eine einzelne Wiederholung an diesem Datum) als erledigt/offen */
+async function toggleEventDone(id, dateStr) {
+  const ev = state.events[id];
+  if (!ev) return;
+  const completedDates = { ...(ev.completedDates || {}) };
+  if (completedDates[dateStr]) {
+    delete completedDates[dateStr];
+  } else {
+    completedDates[dateStr] = true;
+  }
+  try {
+    await update(REFS.event(id), { completedDates: Object.keys(completedDates).length ? completedDates : null });
+  } catch (e) { showToast("Fehler beim Speichern: " + e.message); }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1096,10 +1111,12 @@ function renderDayEvents() {
     const color = calColor(e.calendarId);
     const calName = e.calendarId ? state.calendars[e.calendarId]?.name : null;
     const recurrenceIcon = (e.recurrence && e.recurrence !== "none") ? " 🔁" : "";
+    const isDone = !!(e.completedDates && e.completedDates[sd]);
     return `
-    <li class="event-item" style="--event-color:${color}" data-edit-event="${id}">
-      <span class="event-time">${e.time || "–"}</span>
-      <div class="event-info">
+    <li class="event-item ${isDone ? "done" : ""}" style="--event-color:${color}">
+      <button class="event-checkbox ${isDone ? "checked" : ""}" data-id="${id}" data-date="${sd}" aria-label="Erledigt"></button>
+      <span class="event-time" data-edit-event="${id}">${e.time || "–"}</span>
+      <div class="event-info" data-edit-event="${id}">
         <div class="event-title-text">${escHtml(e.title)}${recurrenceIcon}</div>
         ${e.description ? `<div class="event-desc-text">${escHtml(e.description)}</div>` : ""}
         ${calName ? `<span class="event-cal-badge" style="margin-top:4px;display:inline-block">${escHtml(calName)}${(e.reminderMinutes !== undefined && e.reminderMinutes !== null) ? " · 🔔" : ""}</span>` : ""}
@@ -1139,6 +1156,13 @@ function renderDayEvents() {
   }).join("");
 
   list.innerHTML = eventsHtml + workoutsHtml;
+
+  list.querySelectorAll(".event-checkbox").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleEventDone(btn.dataset.id, btn.dataset.date);
+    });
+  });
 
   list.querySelectorAll('.delete-btn[data-kind="event"]').forEach(btn => {
     btn.addEventListener("click", (e) => {
@@ -3094,7 +3118,7 @@ document.getElementById("color-picker").addEventListener("click", e => {
   dot.classList.add("selected");
   state.selectedProjectColor = dot.dataset.color;
 });
-setupSpectrumPicker("project-spectrum-track", "project-spectrum-handle", hexToHue("#6C63FF"), (hex) => {
+setupSpectrumPicker("project-spectrum-track", "project-spectrum-handle", hexToHue("#C9863F"), (hex) => {
   document.querySelectorAll("#color-picker .color-dot").forEach(d => d.classList.remove("selected"));
   state.selectedProjectColor = hex;
 });
@@ -3118,7 +3142,7 @@ document.getElementById("cal-color-picker").addEventListener("click", e => {
   dot.classList.add("selected");
   state.selectedCalendarColor = dot.dataset.color;
 });
-setupSpectrumPicker("cal-spectrum-track", "cal-spectrum-handle", hexToHue("#6C63FF"), (hex) => {
+setupSpectrumPicker("cal-spectrum-track", "cal-spectrum-handle", hexToHue("#C9863F"), (hex) => {
   document.querySelectorAll("#cal-color-picker .color-dot").forEach(d => d.classList.remove("selected"));
   state.selectedCalendarColor = hex;
 });
@@ -3149,7 +3173,7 @@ document.getElementById("accent-color-picker").addEventListener("click", async (
     showToast("Fehler beim Speichern: " + err.message);
   }
 });
-setupSpectrumPicker("accent-spectrum-track", "accent-spectrum-handle", hexToHue("#6C63FF"), async (hex, isFinal) => {
+setupSpectrumPicker("accent-spectrum-track", "accent-spectrum-handle", hexToHue("#C9863F"), async (hex, isFinal) => {
   applyAccentColor(hex); // während des Ziehens sofort live anwenden
   if (isFinal) {
     try {
